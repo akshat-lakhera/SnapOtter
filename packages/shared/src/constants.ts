@@ -1,3 +1,4 @@
+import { expandCompressPresets } from "./compress-presets.js";
 import { expandConversionPresets } from "./conversion-presets.js";
 import { AUDIO_INPUTS, IMAGE_INPUTS, SUBTITLE_INPUTS, VIDEO_INPUTS } from "./modality.js";
 import { toolSection } from "./section.js";
@@ -1890,7 +1891,11 @@ const BASE_TOOLS: Tool[] = [
   },
 ];
 
-export const TOOLS: Tool[] = [...BASE_TOOLS, ...expandConversionPresets(BASE_TOOLS)];
+export const TOOLS: Tool[] = [
+  ...BASE_TOOLS,
+  ...expandConversionPresets(BASE_TOOLS),
+  ...expandCompressPresets(BASE_TOOLS),
+];
 
 for (const tool of TOOLS) {
   const slug = `/${toolSection(tool)}`;

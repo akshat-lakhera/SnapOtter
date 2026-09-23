@@ -1,4 +1,4 @@
-import { BASE_CONFIG, CONVERSION_PRESETS } from "@snapotter/shared";
+import { BASE_CONFIG, COMPRESS_PRESETS, CONVERSION_PRESETS } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute, getToolConfig } from "../tool-factory.js";
@@ -81,5 +81,31 @@ export function registerConversionPresets(app: FastifyInstance): number {
     });
   }
 
-  return CONVERSION_PRESETS.length - skipped;
+  for (const preset of COMPRESS_PRESETS) {
+    const baseConfig = getToolConfig(preset.base);
+    if (!baseConfig) {
+      app.log.error(
+        { presetId: preset.id, base: preset.base },
+        "compress preset base tool missing; preset disabled",
+      );
+      skipped++;
+      continue;
+    }
+    createToolRoute(app, {
+      toolId: preset.id,
+      settingsSchema: presetSchema(preset.base),
+      process: async () => {
+        throw new Error(`${preset.id} is v2-only`);
+      },
+      processV2: async (ctx) => {
+        const merged = { ...preset.locked, ...(ctx.settings as Record<string, unknown>) };
+        if (!baseConfig.processV2) {
+          throw new Error(`Base "${preset.base}" has no processV2 for preset "${preset.id}"`);
+        }
+        return baseConfig.processV2({ ...ctx, settings: merged });
+      },
+    });
+  }
+
+  return CONVERSION_PRESETS.length + COMPRESS_PRESETS.length - skipped;
 }

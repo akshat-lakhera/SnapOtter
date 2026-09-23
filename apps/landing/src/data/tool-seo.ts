@@ -2830,6 +2830,166 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "compress-image-to-20kb": {
+    searchTitle: "Compress Image to 20 KB Online - Reduce to 20KB",
+    longDescription:
+      "Compress image files to strictly under 20 KB while preserving visual clarity. Perfect for government forms, job portals, avatar uploads, and strict file size limits. All compression runs locally on your machine with zero cloud uploads.",
+    useCases: [
+      "Meet strict 20 KB application portal and government form upload limits",
+      "Create lightweight profile photos and thumbnails under 20 KB",
+      "Optimize small web icons and badges for ultra-fast load times",
+      "Reduce attachment sizes to pass legacy form and portal validators",
+    ],
+    features: [
+      "Automatic iterative encoding targeting 20 KB or less",
+      "Preserves original image dimensions without forced downscaling",
+      "Supports JPEG, PNG, WebP, and AVIF formats",
+      "Live before and after file size comparison",
+      "100% private, client/self-hosted processing with no cloud uploads",
+    ],
+    faqs: [
+      {
+        q: "How do I compress an image to under 20 KB?",
+        a: "Select or drop your image into the tool. SnapOtter automatically optimizes compression and quality parameters until the file size is 20 KB or lower.",
+      },
+      {
+        q: "Will an image compressed to 20 KB look blurry?",
+        a: "SnapOtter uses intelligent multi-pass compression to retain as much edge clarity and fidelity as possible within the 20 KB ceiling.",
+      },
+      {
+        q: "Are my sensitive documents or photos uploaded to any third party?",
+        a: "No. All processing happens entirely within your private SnapOtter instance. Your files never touch external servers.",
+      },
+    ],
+  },
+  "compress-image-to-50kb": {
+    searchTitle: "Compress Image to 50 KB Online - Reduce to 50KB",
+    longDescription:
+      "Compress image files to under 50 KB with smart multi-pass optimization. Ideal for passport photos, exam registration portals, student IDs, and online application uploads with a 50 KB cap. Fully self-hosted and processed locally.",
+    useCases: [
+      "Compress passport and ID photos for exam and visa portals requiring under 50 KB",
+      "Fit photos into signature and document upload fields",
+      "Optimize product catalog thumbnails for lightweight mobile browsing",
+      "Shrink screenshots and graphics for instant email delivery",
+    ],
+    features: [
+      "Automated target compression calibrated to 50 KB",
+      "Maintains aspect ratio and visual structure without distortion",
+      "Supports JPEG, PNG, WebP, and AVIF inputs",
+      "Side-by-side comparison of original and compressed size",
+      "Zero third-party data transmission — processed completely on your own machine",
+    ],
+    faqs: [
+      {
+        q: "Why do many online forms require images under 50 KB?",
+        a: "Many government, university, and banking portals enforce strict 50 KB limits on photos and signatures to conserve database storage and ensure fast submission.",
+      },
+      {
+        q: "Can I compress PNG images to 50 KB?",
+        a: "Yes. SnapOtter processes PNG, JPEG, WebP, and AVIF images, applying palette optimization and encoding adjustments to satisfy the 50 KB threshold.",
+      },
+      {
+        q: "Can I batch compress multiple photos to 50 KB?",
+        a: "Yes, you can upload multiple images simultaneously and SnapOtter will process each file to 50 KB or less.",
+      },
+    ],
+  },
+  "compress-image-to-100kb": {
+    searchTitle: "Compress Image to 100 KB Online - Reduce to 100KB",
+    longDescription:
+      "Reduce image file sizes to 100 KB or less while maintaining high visual quality. The standard target for job applications, resume photos, web publishing, and mobile responsive assets. Processed privately with no cloud transfer.",
+    useCases: [
+      "Compress resume headshots and document photos to 100 KB",
+      "Optimize blog post featured images for faster SEO page speed scores",
+      "Prepare banner and slider images for mobile-first web pages",
+      "Downsize high-resolution camera photos for message and chat attachments",
+    ],
+    features: [
+      "Intelligent target-size optimization for 100 KB",
+      "Preserves color profiles and sharp details",
+      "Accepts JPEG, PNG, WebP, AVIF, TIFF, and HEIC inputs",
+      "Detailed size reduction statistics and download options",
+      "Self-hosted, private execution without telemetry or external tracking",
+    ],
+    faqs: [
+      {
+        q: "Is 100 KB good enough for a website image?",
+        a: "Yes. 100 KB is widely considered an excellent sweet spot between crisp image quality and high web performance for standard blog and e-commerce displays.",
+      },
+      {
+        q: "What happens if my original image is already smaller than 100 KB?",
+        a: "SnapOtter checks the input size and avoids unnecessary re-compression if the file already meets your target constraints.",
+      },
+      {
+        q: "Are file dimensions changed when compressing to 100 KB?",
+        a: "No, dimensions remain unchanged unless you specifically choose to resize. The compression targets file size via encoding efficiency.",
+      },
+    ],
+  },
+  "compress-image-to-200kb": {
+    searchTitle: "Compress Image to 200 KB Online - Reduce to 200KB",
+    longDescription:
+      "Compress photos and graphic images to under 200 KB with virtually zero perceptible loss in fidelity. Excellent for social media banners, website hero images, and portfolio galleries. All operations run directly on your own infrastructure.",
+    useCases: [
+      "Optimize website hero images and headers under a 200 KB budget",
+      "Compress digital artwork and portfolio photographs without noticeable artifacts",
+      "Standardize image collections across content management systems",
+      "Prepare email newsletter imagery that renders quickly on cellular connections",
+    ],
+    features: [
+      "Precision target size limiter set to 200 KB",
+      "High-fidelity encoding preserving subtle gradients and textures",
+      "Compatible with JPEG, PNG, WebP, and AVIF",
+      "Instant processing with download and clipboard options",
+      "Completely private execution on your own hardware",
+    ],
+    faqs: [
+      {
+        q: "Why compress to 200 KB instead of smaller?",
+        a: "A 200 KB target provides ample headroom for complex photographs and multi-color illustrations to retain near-original sharpness while still loading rapidly on all devices.",
+      },
+      {
+        q: "Can I convert format while compressing to 200 KB?",
+        a: "SnapOtter allows selecting modern formats like WebP or AVIF to achieve even better visual quality within the 200 KB ceiling.",
+      },
+      {
+        q: "Does SnapOtter retain EXIF metadata?",
+        a: "By default, non-essential metadata is stripped to minimize file size, but color profile data is preserved for accurate rendering.",
+      },
+    ],
+  },
+  "compress-image-to-500kb": {
+    searchTitle: "Compress Image to 500 KB Online - Reduce to 500KB",
+    longDescription:
+      "Compress high-resolution photos and detailed graphics to under 500 KB. Ideal for high-DPI displays, print previews, and large photography portfolios where maximum visual detail is required under half a megabyte. Completely private and self-hosted.",
+    useCases: [
+      "Compress 10MB+ DSLR camera captures to under 500 KB for responsive client proofs",
+      "Maintain rich textures and vibrant colors for Retina and 4K displays",
+      "Prepare photography for digital magazines and web publications",
+      "Package image assets for rapid transfer across team workspaces",
+    ],
+    features: [
+      "Target size constraint set to 500 KB",
+      "Advanced compression keeping fine details, shadows, and highlights intact",
+      "Supports all common raster formats including JPEG, PNG, WebP, AVIF, and TIFF",
+      "Visual comparison to verify pristine quality before download",
+      "Local execution ensures total privacy and security for proprietary imagery",
+    ],
+    faqs: [
+      {
+        q: "When should I use the 500 KB compression preset?",
+        a: "The 500 KB preset is ideal when you start from a large multi-megabyte photo and want to dramatically reduce file weight without sacrificing high-resolution clarity on desktop screens.",
+      },
+      {
+        q: "How does target-size compression work in SnapOtter?",
+        a: "SnapOtter uses an iterative binary search algorithm over compression quality settings to find the optimal quality level that fits strictly within 500 KB.",
+      },
+      {
+        q: "Does this tool run offline?",
+        a: "Yes. SnapOtter runs self-hosted on your machine or container, processing all images locally without connecting to external cloud services.",
+      },
+    ],
+  },
   "optimize-for-web": {
     searchTitle: "Optimize Images for Web - Speed Up Your Website",
     longDescription:

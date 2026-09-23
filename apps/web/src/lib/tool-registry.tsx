@@ -107,6 +107,11 @@ const ConvertSettings = lazy(() =>
 const CompressSettings = lazy(() =>
   import("@/components/tools/compress-settings").then((m) => ({ default: m.CompressSettings })),
 );
+const CompressPresetSettings = lazy(() =>
+  import("@/components/tools/compress-preset-settings").then((m) => ({
+    default: m.CompressPresetSettings,
+  })),
+);
 const OptimizeForWebSettings = lazy(() =>
   import("@/components/tools/optimize-for-web-settings").then((m) => ({
     default: m.OptimizeForWebSettings,
@@ -937,6 +942,11 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["rotate", { livePreview: true, Settings: RotateSettings as never }],
   ["convert", { Settings: ConvertSettings }],
   ["compress", { Settings: CompressSettings }],
+  ["compress-image-to-20kb", { Settings: CompressPresetSettings }],
+  ["compress-image-to-50kb", { Settings: CompressPresetSettings }],
+  ["compress-image-to-100kb", { Settings: CompressPresetSettings }],
+  ["compress-image-to-200kb", { Settings: CompressPresetSettings }],
+  ["compress-image-to-500kb", { Settings: CompressPresetSettings }],
   ["strip-metadata", { Settings: StripMetadataSettings }],
   ["edit-metadata", { Settings: EditMetadataSettings }],
 

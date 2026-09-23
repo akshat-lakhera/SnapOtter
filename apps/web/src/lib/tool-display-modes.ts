@@ -6,7 +6,7 @@
  * truth for display modes; tool-registry.tsx merges it into registry entries.
  */
 
-import { BASE_CONFIG, CONVERSION_PRESETS } from "@snapotter/shared";
+import { BASE_CONFIG, COMPRESS_PRESETS, CONVERSION_PRESETS } from "@snapotter/shared";
 
 export type DisplayMode =
   | "side-by-side"
@@ -223,6 +223,10 @@ for (const preset of CONVERSION_PRESETS) {
   // ResultsPanel, so they render as a plain converter (no-comparison) like the
   // sibling image-to-pdf / convert-spreadsheet presets.
   TOOL_DISPLAY_MODES[preset.id] = baseMode === "custom-results" ? "no-comparison" : baseMode;
+}
+
+for (const preset of COMPRESS_PRESETS) {
+  TOOL_DISPLAY_MODES[preset.id] = "before-after";
 }
 
 /**

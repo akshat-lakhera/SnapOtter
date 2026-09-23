@@ -554,6 +554,26 @@ export const en = {
     rotate: { name: "Rotate & Flip Image", description: "Rotate, flip, and straighten images" },
     convert: { name: "Convert Image", description: "Convert between image formats" },
     compress: { name: "Compress Image", description: "Reduce file size by quality or target size" },
+    "compress-image-to-20kb": {
+      name: "Compress Image to 20 KB",
+      description: "Compress image file size to under 20 KB",
+    },
+    "compress-image-to-50kb": {
+      name: "Compress Image to 50 KB",
+      description: "Compress image file size to under 50 KB",
+    },
+    "compress-image-to-100kb": {
+      name: "Compress Image to 100 KB",
+      description: "Compress image file size to under 100 KB",
+    },
+    "compress-image-to-200kb": {
+      name: "Compress Image to 200 KB",
+      description: "Compress image file size to under 200 KB",
+    },
+    "compress-image-to-500kb": {
+      name: "Compress Image to 500 KB",
+      description: "Compress image file size to under 500 KB",
+    },
     "optimize-for-web": {
       name: "Optimize for Web",
       description:
