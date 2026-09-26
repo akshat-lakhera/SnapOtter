@@ -566,6 +566,26 @@ export const sv: TranslationKeys = {
       name: "Komprimera bild",
       description: "Minska filstorleken via kvalitet eller målstorlek",
     },
+    "compress-image-to-20kb": {
+      name: "Komprimera bild till 20 KB",
+      description: "Minska bildens filstorlek till under 20 KB",
+    },
+    "compress-image-to-50kb": {
+      name: "Komprimera bild till 50 KB",
+      description: "Minska bildens filstorlek till under 50 KB",
+    },
+    "compress-image-to-100kb": {
+      name: "Komprimera bild till 100 KB",
+      description: "Minska bildens filstorlek till under 100 KB",
+    },
+    "compress-image-to-200kb": {
+      name: "Komprimera bild till 200 KB",
+      description: "Minska bildens filstorlek till under 200 KB",
+    },
+    "compress-image-to-500kb": {
+      name: "Komprimera bild till 500 KB",
+      description: "Minska bildens filstorlek till under 500 KB",
+    },
     "optimize-for-web": {
       name: "Optimera för webb",
       description:
@@ -1366,6 +1386,7 @@ export const sv: TranslationKeys = {
       bestQuality: "Bästa kvalitet",
       submit: "Komprimera",
       submitBatch: "Komprimera ({count} filer)",
+      submitTarget: "Komprimera till {size} KB",
       progressLabel: "Komprimerar",
       original: "Original: {size} KB",
       processed: "Bearbetat: {size} KB",

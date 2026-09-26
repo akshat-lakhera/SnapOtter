@@ -565,6 +565,26 @@ export const id: TranslationKeys = {
       name: "Kompres Gambar",
       description: "Kurangi ukuran file berdasarkan kualitas atau ukuran target",
     },
+    "compress-image-to-20kb": {
+      name: "Kompres Gambar ke 20 KB",
+      description: "Kurangi ukuran file gambar hingga di bawah 20 KB",
+    },
+    "compress-image-to-50kb": {
+      name: "Kompres Gambar ke 50 KB",
+      description: "Kurangi ukuran file gambar hingga di bawah 50 KB",
+    },
+    "compress-image-to-100kb": {
+      name: "Kompres Gambar ke 100 KB",
+      description: "Kurangi ukuran file gambar hingga di bawah 100 KB",
+    },
+    "compress-image-to-200kb": {
+      name: "Kompres Gambar ke 200 KB",
+      description: "Kurangi ukuran file gambar hingga di bawah 200 KB",
+    },
+    "compress-image-to-500kb": {
+      name: "Kompres Gambar ke 500 KB",
+      description: "Kurangi ukuran file gambar hingga di bawah 500 KB",
+    },
     "optimize-for-web": {
       name: "Optimasi untuk Web",
       description:
@@ -1365,6 +1385,7 @@ export const id: TranslationKeys = {
       bestQuality: "Kualitas terbaik",
       submit: "Kompres",
       submitBatch: "Kompres ({count} file)",
+      submitTarget: "Kompres ke {size} KB",
       progressLabel: "Mengompresi",
       original: "Asli: {size} KB",
       processed: "Diproses: {size} KB",

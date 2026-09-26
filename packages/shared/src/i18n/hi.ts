@@ -398,6 +398,26 @@ export const hi: TranslationKeys = {
       name: "इमेज कंप्रेस",
       description: "क्वालिटी या टार्गेट साइज़ के अनुसार फाइल का आकार घटाएं",
     },
+    "compress-image-to-20kb": {
+      name: "इमेज को 20 KB में कंप्रेस करें",
+      description: "इमेज फाइल का आकार 20 KB से कम करें",
+    },
+    "compress-image-to-50kb": {
+      name: "इमेज को 50 KB में कंप्रेस करें",
+      description: "इमेज फाइल का आकार 50 KB से कम करें",
+    },
+    "compress-image-to-100kb": {
+      name: "इमेज को 100 KB में कंप्रेस करें",
+      description: "इमेज फाइल का आकार 100 KB से कम करें",
+    },
+    "compress-image-to-200kb": {
+      name: "इमेज को 200 KB में कंप्रेस करें",
+      description: "इमेज फाइल का आकार 200 KB से कम करें",
+    },
+    "compress-image-to-500kb": {
+      name: "इमेज को 500 KB में कंप्रेस करें",
+      description: "इमेज फाइल का आकार 500 KB से कम करें",
+    },
     "optimize-for-web": {
       name: "वेब के लिए ऑप्टिमाइज़",
       description: "फॉर्मेट कन्वर्शन, क्वालिटी कंट्रोल और लाइव प्रीव्यू के साथ वेब के लिए इमेज ऑप्टिमाइज़ करें",
@@ -1185,6 +1205,7 @@ export const hi: TranslationKeys = {
       bestQuality: "सर्वोत्तम क्वालिटी",
       submit: "कंप्रेस करें",
       submitBatch: "कंप्रेस करें ({count} फाइलें)",
+      submitTarget: "{size} KB में कंप्रेस करें",
       progressLabel: "कंप्रेस हो रहा है",
       original: "मूल: {size} KB",
       processed: "प्रोसेस्ड: {size} KB",

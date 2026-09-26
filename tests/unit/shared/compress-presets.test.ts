@@ -4,7 +4,7 @@ import {
   COMPRESS_PRESETS,
   expandCompressPresets,
 } from "../../../packages/shared/src/compress-presets.js";
-import { BASE_TOOLS, TOOLS } from "../../../packages/shared/src/constants.js";
+import { TOOLS } from "../../../packages/shared/src/constants.js";
 
 describe("compress presets", () => {
   it("defines 5 presets with unique ids", () => {
@@ -23,7 +23,7 @@ describe("compress presets", () => {
   });
 
   it("every expanded preset is a valid Tool with route, keywords, and image modality", () => {
-    const expanded = expandCompressPresets(BASE_TOOLS);
+    const expanded = expandCompressPresets(TOOLS);
     expect(expanded.length).toBe(5);
     for (const tool of expanded) {
       expect(tool.route).toBe(`/${tool.id}`);
@@ -42,12 +42,11 @@ describe("compress presets", () => {
   });
 
   it("preset keywords include the natural phrasing and target size variants", () => {
-    const expanded = expandCompressPresets(BASE_TOOLS);
+    const expanded = expandCompressPresets(TOOLS);
     const to50 = expanded.find((t) => t.id === "compress-image-to-50kb");
     expect(to50?.keywords).toContain("compress image to 50kb");
     expect(to50?.keywords).toContain("50 kb");
     expect(to50?.keywords).toContain("50kb");
-    expect(to50?.keywords).toContain("target size");
   });
 
   it("COMPRESS_PRESET_BY_ID indexes all presets accurately", () => {

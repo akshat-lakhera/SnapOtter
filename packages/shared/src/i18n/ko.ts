@@ -553,6 +553,26 @@ export const ko: TranslationKeys = {
     rotate: { name: "이미지 회전 및 뒤집기", description: "이미지 회전, 뒤집기 및 기울기 보정" },
     convert: { name: "이미지 변환", description: "이미지 포맷 간 변환" },
     compress: { name: "이미지 압축", description: "품질 또는 목표 크기로 파일 크기 축소" },
+    "compress-image-to-20kb": {
+      name: "이미지를 20KB로 압축",
+      description: "이미지 파일 크기를 20KB 미만으로 축소",
+    },
+    "compress-image-to-50kb": {
+      name: "이미지를 50KB로 압축",
+      description: "이미지 파일 크기를 50KB 미만으로 축소",
+    },
+    "compress-image-to-100kb": {
+      name: "이미지를 100KB로 압축",
+      description: "이미지 파일 크기를 100KB 미만으로 축소",
+    },
+    "compress-image-to-200kb": {
+      name: "이미지를 200KB로 압축",
+      description: "이미지 파일 크기를 200KB 미만으로 축소",
+    },
+    "compress-image-to-500kb": {
+      name: "이미지를 500KB로 압축",
+      description: "이미지 파일 크기를 500KB 미만으로 축소",
+    },
     "optimize-for-web": {
       name: "웹 최적화",
       description: "포맷 변환, 품질 조절, 실시간 미리보기로 웹용 이미지 최적화",
@@ -1308,6 +1328,7 @@ export const ko: TranslationKeys = {
       bestQuality: "최고 품질",
       submit: "압축",
       submitBatch: "압축 ({count}개 파일)",
+      submitTarget: "{size}KB로 압축",
       progressLabel: "압축 중",
       original: "원본: {size} KB",
       processed: "처리 후: {size} KB",

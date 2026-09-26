@@ -31,13 +31,6 @@ interface BaseConfig {
 
 /** Per-base routing/config. category may override the base tool's own category for grouping. */
 export const BASE_CONFIG: Record<string, BaseConfig> = {
-  compress: {
-    group: "registry",
-    modality: "image",
-    category: "essentials",
-    settingsKind: "none",
-    displayBase: "compress",
-  },
   convert: {
     group: "registry",
     modality: "image",

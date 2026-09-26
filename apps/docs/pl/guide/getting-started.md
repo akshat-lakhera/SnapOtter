@@ -97,7 +97,7 @@ pnpm dev
 
 | Modalność | Liczba | Przykładowe narzędzia |
 |----------|-------|---------------|
-| **Obraz** | 107 | Zmiana rozmiaru, Kadrowanie, Kompresja, Konwersja, Usuwanie tła, Skalowanie w górę, OCR, Znak wodny, Kolaż, Koloryzacja, Narzędzia GIF, szablony formatów |
+| **Obraz** | 112 | Zmiana rozmiaru, Kadrowanie, Kompresja, Konwersja, Usuwanie tła, Skalowanie w górę, OCR, Znak wodny, Kolaż, Koloryzacja, Narzędzia GIF, szablony formatów |
 | **Wideo** | 57 | Przycinanie, Kadrowanie, Kompresja, Konwersja, Łączenie, Wyodrębnianie audio, Automatyczne napisy, Wideo do GIF, Zmiana rozmiaru, Stabilizacja, szablony formatów |
 | **Audio** | 27 | Przycinanie, Łączenie, Konwersja, Normalizacja, Redukcja szumów, Transkrypcja, Zmiana wysokości dźwięku, Wyciszanie, Kreator dzwonków, szablony formatów |
 | **PDF / Dokument** | 29 | Łączenie, Dzielenie, Kompresja, OCR, Znak wodny, Redagowanie, Word do PDF, Excel do PDF, Obracanie, Zabezpieczanie, Naprawa |

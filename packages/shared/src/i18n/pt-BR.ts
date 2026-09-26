@@ -563,6 +563,26 @@ export const ptBR: TranslationKeys = {
       name: "Comprimir Imagem",
       description: "Reduza o tamanho do arquivo por qualidade ou tamanho alvo",
     },
+    "compress-image-to-20kb": {
+      name: "Comprimir Imagem para 20 KB",
+      description: "Reduza o tamanho do arquivo de imagem para menos de 20 KB",
+    },
+    "compress-image-to-50kb": {
+      name: "Comprimir Imagem para 50 KB",
+      description: "Reduza o tamanho do arquivo de imagem para menos de 50 KB",
+    },
+    "compress-image-to-100kb": {
+      name: "Comprimir Imagem para 100 KB",
+      description: "Reduza o tamanho do arquivo de imagem para menos de 100 KB",
+    },
+    "compress-image-to-200kb": {
+      name: "Comprimir Imagem para 200 KB",
+      description: "Reduza o tamanho do arquivo de imagem para menos de 200 KB",
+    },
+    "compress-image-to-500kb": {
+      name: "Comprimir Imagem para 500 KB",
+      description: "Reduza o tamanho do arquivo de imagem para menos de 500 KB",
+    },
     "optimize-for-web": {
       name: "Otimizar para web",
       description:
@@ -1371,6 +1391,7 @@ export const ptBR: TranslationKeys = {
       bestQuality: "Melhor qualidade",
       submit: "Comprimir",
       submitBatch: "Comprimir ({count} arquivos)",
+      submitTarget: "Comprimir para {size} KB",
       progressLabel: "Comprimindo",
       original: "Original: {size} KB",
       processed: "Processado: {size} KB",

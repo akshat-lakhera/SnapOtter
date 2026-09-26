@@ -558,6 +558,26 @@ export const ja: TranslationKeys = {
     rotate: { name: "画像回転と反転", description: "画像の回転、反転、傾き補正" },
     convert: { name: "画像変換", description: "画像フォーマット間の変換" },
     compress: { name: "画像圧縮", description: "品質またはターゲットサイズでファイルサイズを削減" },
+    "compress-image-to-20kb": {
+      name: "画像を20 KBに圧縮",
+      description: "画像のファイルサイズを20 KB未満に削減",
+    },
+    "compress-image-to-50kb": {
+      name: "画像を50 KBに圧縮",
+      description: "画像のファイルサイズを50 KB未満に削減",
+    },
+    "compress-image-to-100kb": {
+      name: "画像を100 KBに圧縮",
+      description: "画像のファイルサイズを100 KB未満に削減",
+    },
+    "compress-image-to-200kb": {
+      name: "画像を200 KBに圧縮",
+      description: "画像のファイルサイズを200 KB未満に削減",
+    },
+    "compress-image-to-500kb": {
+      name: "画像を500 KBに圧縮",
+      description: "画像のファイルサイズを500 KB未満に削減",
+    },
     "optimize-for-web": {
       name: "Web最適化",
       description: "フォーマット変換、品質調整、ライブプレビューでWeb向けに画像を最適化",
@@ -1328,6 +1348,7 @@ export const ja: TranslationKeys = {
       bestQuality: "最高品質",
       submit: "圧縮",
       submitBatch: "圧縮（{count}ファイル）",
+      submitTarget: "{size} KBに圧縮",
       progressLabel: "圧縮中",
       original: "元：{size} KB",
       processed: "処理後：{size} KB",

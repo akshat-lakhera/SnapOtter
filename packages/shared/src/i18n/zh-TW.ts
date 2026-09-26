@@ -385,6 +385,26 @@ export const zhTW: TranslationKeys = {
     rotate: { name: "旋轉與翻轉影像", description: "旋轉、翻轉和校正影像" },
     convert: { name: "轉換影像", description: "在影像格式之間轉換" },
     compress: { name: "壓縮影像", description: "依品質或目標大小縮減檔案體積" },
+    "compress-image-to-20kb": {
+      name: "壓縮影像至 20 KB",
+      description: "將影像檔案體積壓縮到 20 KB 以下",
+    },
+    "compress-image-to-50kb": {
+      name: "壓縮影像至 50 KB",
+      description: "將影像檔案體積壓縮到 50 KB 以下",
+    },
+    "compress-image-to-100kb": {
+      name: "壓縮影像至 100 KB",
+      description: "將影像檔案體積壓縮到 100 KB 以下",
+    },
+    "compress-image-to-200kb": {
+      name: "壓縮影像至 200 KB",
+      description: "將影像檔案體積壓縮到 200 KB 以下",
+    },
+    "compress-image-to-500kb": {
+      name: "壓縮影像至 500 KB",
+      description: "將影像檔案體積壓縮到 500 KB 以下",
+    },
     "optimize-for-web": {
       name: "網頁最佳化",
       description: "透過格式轉換、品質控制和即時預覽來最佳化網頁影像",
@@ -1134,6 +1154,7 @@ export const zhTW: TranslationKeys = {
       bestQuality: "最佳品質",
       submit: "壓縮",
       submitBatch: "壓縮（{count}個檔案）",
+      submitTarget: "壓縮至 {size} KB",
       progressLabel: "壓縮中",
       original: "原始：{size} KB",
       processed: "處理後：{size} KB",

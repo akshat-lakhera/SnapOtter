@@ -97,7 +97,7 @@ pnpm dev
 
 | Modalität | Anzahl | Beispiel-Tools |
 |----------|-------|---------------|
-| **Bild** | 107 | Größe ändern, zuschneiden, komprimieren, konvertieren, Hintergrund entfernen, hochskalieren, OCR, Wasserzeichen, Collage, kolorieren, GIF-Tools, Format-Vorlagen |
+| **Bild** | 112 | Größe ändern, zuschneiden, komprimieren, konvertieren, Hintergrund entfernen, hochskalieren, OCR, Wasserzeichen, Collage, kolorieren, GIF-Tools, Format-Vorlagen |
 | **Video** | 57 | Trimmen, zuschneiden, komprimieren, konvertieren, zusammenführen, Audio extrahieren, Auto-Untertitel, Video zu GIF, Größe ändern, stabilisieren, Format-Vorlagen |
 | **Audio** | 27 | Trimmen, zusammenführen, konvertieren, normalisieren, Rauschunterdrückung, transkribieren, Tonhöhenverschiebung, Ein-/Ausblenden, Klingelton-Ersteller, Format-Vorlagen |
 | **PDF / Dokument** | 29 | Zusammenführen, teilen, komprimieren, OCR, Wasserzeichen, schwärzen, Word zu PDF, Excel zu PDF, drehen, schützen, reparieren |

@@ -97,7 +97,7 @@ pnpm dev
 
 | Modaliteit | Aantal | Voorbeeldtools |
 |----------|-------|---------------|
-| **Afbeelding** | 107 | Formaat wijzigen, Bijsnijden, Comprimeren, Converteren, Achtergrond verwijderen, Upscale, OCR, Watermerk, Collage, Inkleuren, GIF-tools, formaatpresets |
+| **Afbeelding** | 112 | Formaat wijzigen, Bijsnijden, Comprimeren, Converteren, Achtergrond verwijderen, Upscale, OCR, Watermerk, Collage, Inkleuren, GIF-tools, formaatpresets |
 | **Video** | 57 | Trimmen, Bijsnijden, Comprimeren, Converteren, Samenvoegen, Audio extraheren, Automatische ondertitels, Video naar GIF, Formaat wijzigen, Stabiliseren, formaatpresets |
 | **Audio** | 27 | Trimmen, Samenvoegen, Converteren, Normaliseren, Ruisonderdrukking, Transcriberen, Pitch verschuiven, Fade, Beltoonmaker, formaatpresets |
 | **PDF / Document** | 29 | Samenvoegen, Splitsen, Comprimeren, OCR, Watermerk, Redigeren, Word naar PDF, Excel naar PDF, Roteren, Beveiligen, Repareren |

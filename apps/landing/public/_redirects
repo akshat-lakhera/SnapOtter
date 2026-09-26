@@ -485,3 +485,13 @@
 /tools/flac-to-mp3 /tools/audio/flac-to-mp3/ 301
 /tools/excel-to-csv/ /tools/files/excel-to-csv/ 301
 /tools/excel-to-csv /tools/files/excel-to-csv/ 301
+/tools/compress-image-to-20kb/ /tools/image/compress-image-to-20kb/ 301
+/tools/compress-image-to-20kb /tools/image/compress-image-to-20kb/ 301
+/tools/compress-image-to-50kb/ /tools/image/compress-image-to-50kb/ 301
+/tools/compress-image-to-50kb /tools/image/compress-image-to-50kb/ 301
+/tools/compress-image-to-100kb/ /tools/image/compress-image-to-100kb/ 301
+/tools/compress-image-to-100kb /tools/image/compress-image-to-100kb/ 301
+/tools/compress-image-to-200kb/ /tools/image/compress-image-to-200kb/ 301
+/tools/compress-image-to-200kb /tools/image/compress-image-to-200kb/ 301
+/tools/compress-image-to-500kb/ /tools/image/compress-image-to-500kb/ 301
+/tools/compress-image-to-500kb /tools/image/compress-image-to-500kb/ 301

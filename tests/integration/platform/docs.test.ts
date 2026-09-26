@@ -142,7 +142,7 @@ describe("API docs", () => {
     }
     expect([...perSection.values()].reduce((sum, count) => sum + count, 0)).toBe(TOOLS.length);
     expect(deployment).not.toContain("All 138 non-AI tools");
-    expect(architecture).toContain("243 tool routes");
+    expect(architecture).toContain("248 tool routes");
   });
 
   it("serves an LLM summary with live catalog tools", async () => {
@@ -152,7 +152,7 @@ describe("API docs", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain("## Tools");
-    expect(res.body).toContain("- Image (107 tools)");
+    expect(res.body).toContain("- Image (112 tools)");
     expect(res.body).toContain("Resize Image - Resize by pixels");
     expect(res.body).toContain("Sign PDF -");
   });

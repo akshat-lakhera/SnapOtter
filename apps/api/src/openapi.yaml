@@ -554,6 +554,281 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
+  /api/v1/tools/image/compress-image-to-20kb:
+    post:
+      operationId: compressImageTo20KbTool
+      tags: [Tools]
+      summary: "Compress Image to 20 KB"
+      description: |
+        Compress an image to a 20 KB target size
+        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Image file to compress"
+                settings:
+                  type: string
+                  description: |
+                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 20.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/compress-image-to-50kb:
+    post:
+      operationId: compressImageTo50KbTool
+      tags: [Tools]
+      summary: "Compress Image to 50 KB"
+      description: |
+        Compress an image to a 50 KB target size
+        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Image file to compress"
+                settings:
+                  type: string
+                  description: |
+                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 50.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/compress-image-to-100kb:
+    post:
+      operationId: compressImageTo100KbTool
+      tags: [Tools]
+      summary: "Compress Image to 100 KB"
+      description: |
+        Compress an image to a 100 KB target size
+        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Image file to compress"
+                settings:
+                  type: string
+                  description: |
+                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 100.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/compress-image-to-200kb:
+    post:
+      operationId: compressImageTo200KbTool
+      tags: [Tools]
+      summary: "Compress Image to 200 KB"
+      description: |
+        Compress an image to a 200 KB target size
+        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Image file to compress"
+                settings:
+                  type: string
+                  description: |
+                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 200.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/compress-image-to-500kb:
+    post:
+      operationId: compressImageTo500KbTool
+      tags: [Tools]
+      summary: "Compress Image to 500 KB"
+      description: |
+        Compress an image to a 500 KB target size
+        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Image file to compress"
+                settings:
+                  type: string
+                  description: |
+                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 500.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/tools/image/strip-metadata:
     post:
       operationId: stripMetadata

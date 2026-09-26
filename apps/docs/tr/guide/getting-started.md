@@ -97,7 +97,7 @@ pnpm dev
 
 | Modalite | Sayı | Örnek Araçlar |
 |----------|-------|---------------|
-| **Görsel** | 107 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Ölçek Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, format ön ayarları |
+| **Görsel** | 112 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Ölçek Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, format ön ayarları |
 | **Video** | 57 | Kırp, Kes, Sıkıştır, Dönüştür, Birleştir, Ses Çıkar, Otomatik Altyazılar, Video'dan GIF'e, Yeniden Boyutlandır, Sabitle, format ön ayarları |
 | **Ses** | 27 | Kırp, Birleştir, Dönüştür, Normalleştir, Gürültü Azaltma, Transkribe Et, Perde Kaydırma, Kısılma, Zil Sesi Oluşturucu, format ön ayarları |
 | **PDF / Belge** | 29 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Sansürle, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |

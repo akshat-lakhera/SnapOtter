@@ -559,6 +559,26 @@ export const es: TranslationKeys = {
       name: "Comprimir imagen",
       description: "Reduce el tamaño del archivo por calidad o tamaño objetivo",
     },
+    "compress-image-to-20kb": {
+      name: "Comprimir imagen a 20 KB",
+      description: "Reduce el tamaño del archivo de imagen a menos de 20 KB",
+    },
+    "compress-image-to-50kb": {
+      name: "Comprimir imagen a 50 KB",
+      description: "Reduce el tamaño del archivo de imagen a menos de 50 KB",
+    },
+    "compress-image-to-100kb": {
+      name: "Comprimir imagen a 100 KB",
+      description: "Reduce el tamaño del archivo de imagen a menos de 100 KB",
+    },
+    "compress-image-to-200kb": {
+      name: "Comprimir imagen a 200 KB",
+      description: "Reduce el tamaño del archivo de imagen a menos de 200 KB",
+    },
+    "compress-image-to-500kb": {
+      name: "Comprimir imagen a 500 KB",
+      description: "Reduce el tamaño del archivo de imagen a menos de 500 KB",
+    },
     "optimize-for-web": {
       name: "Optimizar para web",
       description:
@@ -1357,6 +1377,7 @@ export const es: TranslationKeys = {
       bestQuality: "Mejor calidad",
       submit: "Comprimir",
       submitBatch: "Comprimir ({count} archivos)",
+      submitTarget: "Comprimir a {size} KB",
       progressLabel: "Comprimiendo",
       original: "Original: {size} KB",
       processed: "Procesado: {size} KB",

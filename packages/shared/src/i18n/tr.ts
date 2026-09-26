@@ -565,6 +565,26 @@ export const tr: TranslationKeys = {
       name: "Görüntü Sıkıştır",
       description: "Kalite veya hedef boyuta göre dosya boyutunu küçültün",
     },
+    "compress-image-to-20kb": {
+      name: "Görüntüyü 20 KB'a Sıkıştır",
+      description: "Görüntü dosya boyutunu 20 KB'ın altına küçültün",
+    },
+    "compress-image-to-50kb": {
+      name: "Görüntüyü 50 KB'a Sıkıştır",
+      description: "Görüntü dosya boyutunu 50 KB'ın altına küçültün",
+    },
+    "compress-image-to-100kb": {
+      name: "Görüntüyü 100 KB'a Sıkıştır",
+      description: "Görüntü dosya boyutunu 100 KB'ın altına küçültün",
+    },
+    "compress-image-to-200kb": {
+      name: "Görüntüyü 200 KB'a Sıkıştır",
+      description: "Görüntü dosya boyutunu 200 KB'ın altına küçültün",
+    },
+    "compress-image-to-500kb": {
+      name: "Görüntüyü 500 KB'a Sıkıştır",
+      description: "Görüntü dosya boyutunu 500 KB'ın altına küçültün",
+    },
     "optimize-for-web": {
       name: "Web İçin Optimize Et",
       description:
@@ -1369,6 +1389,7 @@ export const tr: TranslationKeys = {
       bestQuality: "En iyi kalite",
       submit: "Sıkıştır",
       submitBatch: "Sıkıştır ({count} dosya)",
+      submitTarget: "{size} KB'a sıkıştır",
       progressLabel: "Sıkıştırılıyor",
       original: "Orijinal: {size} KB",
       processed: "İşlenmiş: {size} KB",

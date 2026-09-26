@@ -1,5 +1,6 @@
 import {
   ANALYTICS_EVENTS,
+  COMPRESS_PRESET_BY_ID,
   getRequiredBundlesForTool,
   PYTHON_SIDECAR_TOOLS,
   SECTIONS,
@@ -254,7 +255,10 @@ export function ToolPage() {
     return featureBundles.find((b) => b.id === required[0]) ?? null;
   }, [toolId, featureBundles]);
   const toolInstalled = featureBundle ? featureBundle.status === "installed" : !isAiTool;
-  const showSizeComparison = toolId === "compress" || toolId === "optimize-for-web";
+  const showSizeComparison =
+    toolId === "compress" ||
+    toolId === "optimize-for-web" ||
+    (toolId !== undefined && toolId in COMPRESS_PRESET_BY_ID);
   usePageTitle(tool ? getToolName(t, tool.id, tool.name) : undefined);
   const { hasPermission } = useAuth();
   const isAdmin = hasPermission("settings:write");

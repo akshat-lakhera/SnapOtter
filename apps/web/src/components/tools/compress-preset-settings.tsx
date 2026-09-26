@@ -12,7 +12,6 @@ export function CompressPresetSettings() {
   const params = useParams<{ toolId: string }>();
   const toolId = params.toolId ?? "";
   const preset = COMPRESS_PRESET_BY_ID[toolId];
-  const targetKb = preset?.sizeKb ?? 50;
 
   const { files } = useFileStore();
   const {
@@ -41,17 +40,19 @@ export function CompressPresetSettings() {
     if (hasFile && !processing) handleProcess();
   };
 
+  if (!preset) {
+    throw new Error(`No compress preset registered for tool "${toolId}"`);
+  }
+  const targetKb = preset.sizeKb;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Target size badge */}
-      <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-1">
+      <div className="rounded-lg border border-border bg-muted/40 p-3">
         <div className="flex justify-between items-center text-xs">
           <span className="text-muted-foreground">{t.toolSettings.compress.targetSize}</span>
           <span className="font-semibold font-mono text-foreground">{targetKb} KB</span>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          {preset?.description ?? `Compress to under ${targetKb} KB`}
-        </p>
       </div>
 
       {/* Error */}
@@ -94,7 +95,7 @@ export function CompressPresetSettings() {
         >
           {files.length > 1
             ? format(t.toolSettings.compress.submitBatch, { count: files.length })
-            : `Compress to ${targetKb} KB`}
+            : format(t.toolSettings.compress.submitTarget, { size: targetKb })}
         </button>
       )}
 

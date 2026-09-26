@@ -384,6 +384,26 @@ export const zhCN: TranslationKeys = {
     rotate: { name: "旋转和翻转图片", description: "旋转、翻转和校正图片" },
     convert: { name: "转换图片", description: "在图片格式之间转换" },
     compress: { name: "压缩图片", description: "通过质量或目标大小缩减文件体积" },
+    "compress-image-to-20kb": {
+      name: "压缩图片至 20 KB",
+      description: "将图片文件体积压缩到 20 KB 以下",
+    },
+    "compress-image-to-50kb": {
+      name: "压缩图片至 50 KB",
+      description: "将图片文件体积压缩到 50 KB 以下",
+    },
+    "compress-image-to-100kb": {
+      name: "压缩图片至 100 KB",
+      description: "将图片文件体积压缩到 100 KB 以下",
+    },
+    "compress-image-to-200kb": {
+      name: "压缩图片至 200 KB",
+      description: "将图片文件体积压缩到 200 KB 以下",
+    },
+    "compress-image-to-500kb": {
+      name: "压缩图片至 500 KB",
+      description: "将图片文件体积压缩到 500 KB 以下",
+    },
     "optimize-for-web": {
       name: "网页优化",
       description: "通过格式转换、质量控制和实时预览优化网页图片",
@@ -1134,6 +1154,7 @@ export const zhCN: TranslationKeys = {
       bestQuality: "最佳质量",
       submit: "压缩",
       submitBatch: "压缩（{count} 个文件）",
+      submitTarget: "压缩至 {size} KB",
       progressLabel: "压缩中",
       original: "原始：{size} KB",
       processed: "处理后：{size} KB",

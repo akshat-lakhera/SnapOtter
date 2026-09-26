@@ -563,6 +563,26 @@ export const ar: TranslationKeys = {
       name: "ضغط الصورة",
       description: "تقليل حجم الملف حسب الجودة أو الحجم المستهدف",
     },
+    "compress-image-to-20kb": {
+      name: "ضغط الصورة إلى 20 KB",
+      description: "تقليل حجم ملف الصورة إلى أقل من 20 KB",
+    },
+    "compress-image-to-50kb": {
+      name: "ضغط الصورة إلى 50 KB",
+      description: "تقليل حجم ملف الصورة إلى أقل من 50 KB",
+    },
+    "compress-image-to-100kb": {
+      name: "ضغط الصورة إلى 100 KB",
+      description: "تقليل حجم ملف الصورة إلى أقل من 100 KB",
+    },
+    "compress-image-to-200kb": {
+      name: "ضغط الصورة إلى 200 KB",
+      description: "تقليل حجم ملف الصورة إلى أقل من 200 KB",
+    },
+    "compress-image-to-500kb": {
+      name: "ضغط الصورة إلى 500 KB",
+      description: "تقليل حجم ملف الصورة إلى أقل من 500 KB",
+    },
     "optimize-for-web": {
       name: "تحسين للويب",
       description: "تحسين الصور للويب مع تحويل الصيغة والتحكم بالجودة والمعاينة المباشرة",
@@ -1354,6 +1374,7 @@ export const ar: TranslationKeys = {
       bestQuality: "أفضل جودة",
       submit: "ضغط",
       submitBatch: "ضغط ({count} ملف)",
+      submitTarget: "ضغط إلى {size} KB",
       progressLabel: "جاري الضغط",
       original: "الأصلي: {size} KB",
       processed: "المعالج: {size} KB",

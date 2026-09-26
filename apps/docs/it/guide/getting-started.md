@@ -97,7 +97,7 @@ pnpm dev
 
 | Modalità | Numero | Strumenti di esempio |
 |----------|-------|---------------|
-| **Immagine** | 107 | Ridimensiona, Ritaglia, Comprimi, Converti, Rimuovi sfondo, Upscaling, OCR, Filigrana, Collage, Colorizza, Strumenti GIF, preset di formato |
+| **Immagine** | 112 | Ridimensiona, Ritaglia, Comprimi, Converti, Rimuovi sfondo, Upscaling, OCR, Filigrana, Collage, Colorizza, Strumenti GIF, preset di formato |
 | **Video** | 57 | Taglia, Ritaglia, Comprimi, Converti, Unisci, Estrai audio, Sottotitoli automatici, Da video a GIF, Ridimensiona, Stabilizza, preset di formato |
 | **Audio** | 27 | Taglia, Unisci, Converti, Normalizza, Riduzione del rumore, Trascrivi, Cambio di tonalità, Dissolvenza, Creatore di suonerie, preset di formato |
 | **PDF / Documenti** | 29 | Unisci, Dividi, Comprimi, OCR, Filigrana, Oscura, Da Word a PDF, Da Excel a PDF, Ruota, Proteggi, Ripara |

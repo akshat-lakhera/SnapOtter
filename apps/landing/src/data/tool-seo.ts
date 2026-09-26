@@ -2842,10 +2842,10 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
     features: [
       "Automatic iterative encoding targeting 20 KB or less",
-      "Preserves original image dimensions without forced downscaling",
+      "Lowers quality first and scales dimensions down only when quality alone can't reach the target",
       "Supports JPEG, PNG, WebP, and AVIF formats",
       "Live before and after file size comparison",
-      "100% private, client/self-hosted processing with no cloud uploads",
+      "100% private, self-hosted processing with no cloud uploads",
     ],
     faqs: [
       {
@@ -2877,7 +2877,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Maintains aspect ratio and visual structure without distortion",
       "Supports JPEG, PNG, WebP, and AVIF inputs",
       "Side-by-side comparison of original and compressed size",
-      "Zero third-party data transmission — processed completely on your own machine",
+      "Zero third-party data transmission, processed entirely on your own server",
     ],
     faqs: [
       {
@@ -2906,7 +2906,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
     features: [
       "Intelligent target-size optimization for 100 KB",
-      "Preserves color profiles and sharp details",
+      "Keeps as much detail as the size target allows",
       "Accepts JPEG, PNG, WebP, AVIF, TIFF, and HEIC inputs",
       "Detailed size reduction statistics and download options",
       "Self-hosted, private execution without telemetry or external tracking",
@@ -2922,7 +2922,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "Are file dimensions changed when compressing to 100 KB?",
-        a: "No, dimensions remain unchanged unless you specifically choose to resize. The compression targets file size via encoding efficiency.",
+        a: "Only when it has to. SnapOtter lowers encoding quality first, and if the file still doesn't fit under 100 KB it scales the image down step by step until it does.",
       },
     ],
   },
@@ -2954,7 +2954,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "Does SnapOtter retain EXIF metadata?",
-        a: "By default, non-essential metadata is stripped to minimize file size, but color profile data is preserved for accurate rendering.",
+        a: "No. Metadata, including EXIF and embedded color profiles, is stripped to save space, and colors are converted to sRGB.",
       },
     ],
   },

@@ -567,6 +567,26 @@ export const vi: TranslationKeys = {
       name: "Nén ảnh",
       description: "Giảm dung lượng tệp theo chất lượng hoặc kích thước mục tiêu",
     },
+    "compress-image-to-20kb": {
+      name: "Nén ảnh xuống 20 KB",
+      description: "Giảm dung lượng tệp ảnh xuống dưới 20 KB",
+    },
+    "compress-image-to-50kb": {
+      name: "Nén ảnh xuống 50 KB",
+      description: "Giảm dung lượng tệp ảnh xuống dưới 50 KB",
+    },
+    "compress-image-to-100kb": {
+      name: "Nén ảnh xuống 100 KB",
+      description: "Giảm dung lượng tệp ảnh xuống dưới 100 KB",
+    },
+    "compress-image-to-200kb": {
+      name: "Nén ảnh xuống 200 KB",
+      description: "Giảm dung lượng tệp ảnh xuống dưới 200 KB",
+    },
+    "compress-image-to-500kb": {
+      name: "Nén ảnh xuống 500 KB",
+      description: "Giảm dung lượng tệp ảnh xuống dưới 500 KB",
+    },
     "optimize-for-web": {
       name: "Tối ưu cho Web",
       description:
@@ -1366,6 +1386,7 @@ export const vi: TranslationKeys = {
       bestQuality: "Chất lượng tốt nhất",
       submit: "Nén",
       submitBatch: "Nén ({count} tệp)",
+      submitTarget: "Nén xuống {size} KB",
       progressLabel: "Đang nén",
       original: "Gốc: {size} KB",
       processed: "Đã xử lý: {size} KB",

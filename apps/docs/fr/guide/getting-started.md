@@ -97,7 +97,7 @@ pnpm dev
 
 | Modalité | Nombre | Outils d'exemple |
 |----------|-------|---------------|
-| **Image** | 107 | Redimensionner, Rogner, Compresser, Convertir, Supprimer l'arrière-plan, Agrandir, OCR, Filigrane, Collage, Coloriser, Outils GIF, préréglages de format |
+| **Image** | 112 | Redimensionner, Rogner, Compresser, Convertir, Supprimer l'arrière-plan, Agrandir, OCR, Filigrane, Collage, Coloriser, Outils GIF, préréglages de format |
 | **Vidéo** | 57 | Couper, Rogner, Compresser, Convertir, Fusionner, Extraire l'audio, Sous-titres automatiques, Vidéo vers GIF, Redimensionner, Stabiliser, préréglages de format |
 | **Audio** | 27 | Couper, Fusionner, Convertir, Normaliser, Réduction du bruit, Transcrire, Décalage de hauteur, Fondu, Créateur de sonnerie, préréglages de format |
 | **PDF / Document** | 29 | Fusionner, Diviser, Compresser, OCR, Filigrane, Caviarder, Word vers PDF, Excel vers PDF, Pivoter, Protéger, Réparer |
