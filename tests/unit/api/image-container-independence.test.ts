@@ -1,4 +1,4 @@
-import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
+import { COMPRESS_PRESETS, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -176,6 +176,12 @@ const NOT_RUNNABLE: Record<string, string> = {
   histogram: "v2-only contract: no single-buffer process to call",
   "lqip-placeholder": "v2-only contract: no single-buffer process to call",
   "sprite-sheet": "v2-only contract: no single-buffer process to call",
+  ...Object.fromEntries(
+    COMPRESS_PRESETS.map((preset) => [
+      preset.id,
+      "v2-only preset over compress with a locked target size; compress itself is covered above",
+    ]),
+  ),
 };
 
 /**
