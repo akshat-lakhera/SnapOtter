@@ -3556,6 +3556,11 @@ export const ru: TranslationKeys = {
       submit: "Упорядочить",
       submitBatch: "Упорядочить ({count} файлов)",
       progressLabel: "Упорядочивание",
+      dragHint: "Перетащите страницы, чтобы изменить порядок",
+      resetOrder: "Сбросить порядок",
+      pageLabel: "Страница {n}",
+      orderTooLong:
+        "Слишком много отдельных перемещений для отправки. Сбросьте порядок и попробуйте внести меньше изменений.",
     },
     "protect-pdf": {
       userPassword: "Пароль пользователя",
@@ -4825,7 +4830,7 @@ export const ru: TranslationKeys = {
     verify: "Подтвердить",
     verifying: "Проверка...",
     mfaInvalidCode: "Неверный код. Попробуйте ещё раз.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Настройте двухфакторную аутентификацию, чтобы продолжить",
     mfaEnrollmentRequired:
       "Ваша организация требует многофакторную аутентификацию. Настройте MFA в параметрах учётной записи.",
     mfaPolicyUnavailable: "Не удалось проверить политику MFA. Повторите попытку чуть позже.",

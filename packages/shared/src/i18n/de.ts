@@ -3569,6 +3569,11 @@ export const de: TranslationKeys = {
       submit: "Neu anordnen",
       submitBatch: "Neu anordnen ({count} Dateien)",
       progressLabel: "Wird neu angeordnet",
+      dragHint: "Seiten zum Neuanordnen ziehen",
+      resetOrder: "Reihenfolge zurücksetzen",
+      pageLabel: "Seite {n}",
+      orderTooLong:
+        "Zu viele einzelne Verschiebungen zum Senden. Setze zurück und versuche es mit weniger Änderungen.",
     },
     "protect-pdf": {
       userPassword: "Benutzerkennwort",
@@ -4848,7 +4853,7 @@ export const de: TranslationKeys = {
     verify: "Bestätigen",
     verifying: "Wird überprüft...",
     mfaInvalidCode: "Ungültiger Code. Bitte versuchen Sie es erneut.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Richten Sie die Zwei-Faktor-Authentifizierung ein, um fortzufahren",
     mfaEnrollmentRequired:
       "Ihre Organisation erfordert Multi-Faktor-Authentifizierung. Bitte richten Sie MFA in Ihren Kontoeinstellungen ein.",
     mfaPolicyUnavailable:

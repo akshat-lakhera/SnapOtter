@@ -9,11 +9,13 @@ import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { reportError } from "../../lib/error-report.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { logger } from "../../lib/logger.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -35,7 +37,7 @@ const settingsSchema = z.object({
 
 type EnhancementSettings = z.infer<typeof settingsSchema>;
 
-async function processImageEnhancement(
+export async function processImageEnhancement(
   rawBuffer: Buffer,
   settings: EnhancementSettings,
   filename: string,
@@ -132,8 +134,17 @@ async function processImageEnhancement(
           colorNoise: 20,
         });
         buffer = result.buffer;
-      } catch {
-        // SCUNet unavailable, fall back to the Sharp-only result
+      } catch (err) {
+        // isToolInstalled() only filters out bundles the install record says
+        // are absent, so what lands here is a pass that was meant to run and
+        // broke: a sidecar crash, an OOM, a bad scratch dir, missing or corrupt
+        // model files. The Sharp-only result is still the right response, but
+        // the failure has to stay visible in the logs and in Sentry.
+        logger.warn(
+          { err, toolId: "image-enhancement" },
+          "deep enhance failed, returning the Sharp-only result",
+        );
+        void reportError(err, { source: "worker", toolId: "image-enhancement" });
       } finally {
         await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }

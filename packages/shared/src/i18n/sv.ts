@@ -3549,6 +3549,11 @@ export const sv: TranslationKeys = {
       submit: "Ordna om",
       submitBatch: "Ordna om ({count} filer)",
       progressLabel: "Ordnar om",
+      dragHint: "Dra sidorna för att ordna om dem",
+      resetOrder: "Återställ ordning",
+      pageLabel: "Sida {n}",
+      orderTooLong:
+        "För många separata flyttar att skicka. Återställ och försök med färre ändringar.",
     },
     "protect-pdf": {
       userPassword: "Användarlösenord",
@@ -4816,7 +4821,7 @@ export const sv: TranslationKeys = {
     verify: "Verifiera",
     verifying: "Verifierar...",
     mfaInvalidCode: "Ogiltig kod. Försök igen.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Konfigurera tvåfaktorsautentisering för att fortsätta",
     mfaEnrollmentRequired:
       "Din organisation kräver multifaktorautentisering. Konfigurera MFA i dina kontoinställningar.",
     mfaPolicyUnavailable: "MFA-policyn kunde inte kontrolleras. Försök igen om en stund.",

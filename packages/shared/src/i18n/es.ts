@@ -3547,6 +3547,11 @@ export const es: TranslationKeys = {
       submit: "Reordenar",
       submitBatch: "Reordenar ({count} archivos)",
       progressLabel: "Reordenando",
+      dragHint: "Arrastra las páginas para reordenarlas",
+      resetOrder: "Restablecer orden",
+      pageLabel: "Página {n}",
+      orderTooLong:
+        "Demasiados movimientos separados para enviar. Restablece e intenta con menos cambios.",
     },
     "protect-pdf": {
       userPassword: "Contraseña de usuario",
@@ -4823,7 +4828,7 @@ export const es: TranslationKeys = {
     verify: "Verificar",
     verifying: "Verificando...",
     mfaInvalidCode: "Código no válido. Inténtalo de nuevo.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Configura la autenticación en dos pasos para continuar",
     mfaEnrollmentRequired:
       "Tu organización requiere autenticación multifactor. Configura MFA en los ajustes de tu cuenta.",
     mfaPolicyUnavailable:

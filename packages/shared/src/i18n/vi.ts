@@ -3549,6 +3549,11 @@ export const vi: TranslationKeys = {
       submit: "Sắp xếp lại",
       submitBatch: "Sắp xếp lại ({count} tệp)",
       progressLabel: "Đang sắp xếp lại",
+      dragHint: "Kéo các trang để sắp xếp lại",
+      resetOrder: "Đặt lại thứ tự",
+      pageLabel: "Trang {n}",
+      orderTooLong:
+        "Có quá nhiều lần di chuyển riêng lẻ để gửi. Hãy đặt lại và thử với ít thay đổi hơn.",
     },
     "protect-pdf": {
       userPassword: "Mật khẩu người dùng",
@@ -4808,7 +4813,7 @@ export const vi: TranslationKeys = {
     verify: "Xác minh",
     verifying: "Đang xác minh...",
     mfaInvalidCode: "Mã không hợp lệ. Vui lòng thử lại.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Thiết lập xác thực hai yếu tố để tiếp tục",
     mfaEnrollmentRequired:
       "Tổ chức của bạn yêu cầu xác thực đa yếu tố. Vui lòng thiết lập MFA trong cài đặt tài khoản.",
     mfaPolicyUnavailable: "Không thể kiểm tra chính sách MFA. Vui lòng thử lại sau giây lát.",

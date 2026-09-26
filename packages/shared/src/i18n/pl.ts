@@ -3554,6 +3554,11 @@ export const pl: TranslationKeys = {
       submit: "Zmień kolejność",
       submitBatch: "Zmień kolejność ({count} plików)",
       progressLabel: "Zmiana kolejności",
+      dragHint: "Przeciągnij strony, aby zmienić kolejność",
+      resetOrder: "Przywróć kolejność",
+      pageLabel: "Strona {n}",
+      orderTooLong:
+        "Zbyt wiele osobnych przesunięć do wysłania. Przywróć kolejność i spróbuj z mniejszą liczbą zmian.",
     },
     "protect-pdf": {
       userPassword: "Hasło użytkownika",
@@ -4831,7 +4836,7 @@ export const pl: TranslationKeys = {
     verify: "Zweryfikuj",
     verifying: "Weryfikowanie...",
     mfaInvalidCode: "Nieprawidłowy kod. Spróbuj ponownie.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Skonfiguruj uwierzytelnianie dwuskładnikowe, aby kontynuować",
     mfaEnrollmentRequired:
       "Twoja organizacja wymaga uwierzytelniania wieloskładnikowego. Skonfiguruj MFA w ustawieniach konta.",
     mfaPolicyUnavailable: "Nie udało się sprawdzić polityki MFA. Spróbuj ponownie za chwilę.",

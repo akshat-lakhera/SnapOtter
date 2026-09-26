@@ -3,7 +3,9 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
+import { MAX_ORDER_LENGTH, serializePageOrder } from "@/lib/page-order";
 import { useFileStore } from "@/stores/file-store";
+import { useOrganizeStore } from "@/stores/organize-store";
 
 export function OrganizePdfSettings() {
   const { t } = useTranslation();
@@ -13,12 +15,24 @@ export function OrganizePdfSettings() {
     useToolProcessor("organize-pdf");
 
   const [order, setOrder] = useState("1-z");
+  const { file: orderedFile, pageOrder, pageCount, clear } = useOrganizeStore();
+
+  // The arranged order outlives the grid (it unmounts while a result shows),
+  // so drop it when the tool itself goes away.
+  useEffect(() => clear, [clear]);
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
 
+  // With one PDF open, the page grid owns the order and this panel reports what
+  // it will send. Batches and unrenderable PDFs keep the typed qpdf spec, and so
+  // does an order left over from a different file.
+  const isVisual = !hasMultiple && pageCount > 0 && orderedFile === files[0];
+  const effectiveOrder = isVisual ? serializePageOrder(pageOrder, pageCount) : order;
+  const tooLong = effectiveOrder.length > MAX_ORDER_LENGTH;
+
   const handleProcess = () => {
-    const settings = { order };
+    const settings = { order: effectiveOrder };
     if (hasMultiple) {
       processAllFiles(files, settings);
     } else {
@@ -35,13 +49,15 @@ export function OrganizePdfSettings() {
         <input
           id="op-order"
           type="text"
-          value={order}
+          value={effectiveOrder}
+          readOnly={isVisual}
           onChange={(e) => setOrder(e.target.value)}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground read-only:text-muted-foreground"
         />
         <p className="text-[10px] text-muted-foreground mt-0.5">{s.orderHint}</p>
       </div>
 
+      {tooLong && <p className="text-xs text-destructive-ink">{s.orderTooLong}</p>}
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
@@ -58,7 +74,7 @@ export function OrganizePdfSettings() {
           type="button"
           data-testid="organize-pdf-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || tooLong}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}

@@ -3560,6 +3560,11 @@ export const it: TranslationKeys = {
       submit: "Riordina",
       submitBatch: "Riordina ({count} file)",
       progressLabel: "Riordinamento",
+      dragHint: "Trascina le pagine per riordinarle",
+      resetOrder: "Ripristina ordine",
+      pageLabel: "Pagina {n}",
+      orderTooLong:
+        "Troppi spostamenti separati da inviare. Ripristina e prova con meno modifiche.",
     },
     "protect-pdf": {
       userPassword: "Password utente",
@@ -4836,7 +4841,7 @@ export const it: TranslationKeys = {
     verify: "Verifica",
     verifying: "Verifica in corso...",
     mfaInvalidCode: "Codice non valido. Riprova.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Configura l'autenticazione a due fattori per continuare",
     mfaEnrollmentRequired:
       "La tua organizzazione richiede l'autenticazione a più fattori. Configura l'MFA nelle impostazioni del tuo account.",
     mfaPolicyUnavailable: "Impossibile verificare la policy MFA. Riprova tra qualche istante.",

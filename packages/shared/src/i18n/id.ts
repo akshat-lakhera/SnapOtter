@@ -3551,6 +3551,11 @@ export const id: TranslationKeys = {
       submit: "Urutkan Ulang",
       submitBatch: "Urutkan Ulang ({count} file)",
       progressLabel: "Mengurutkan ulang",
+      dragHint: "Seret halaman untuk mengurutkan ulang",
+      resetOrder: "Atur ulang urutan",
+      pageLabel: "Halaman {n}",
+      orderTooLong:
+        "Terlalu banyak perpindahan terpisah untuk dikirim. Atur ulang dan coba dengan lebih sedikit perubahan.",
     },
     "protect-pdf": {
       userPassword: "Kata sandi pengguna",
@@ -4817,7 +4822,7 @@ export const id: TranslationKeys = {
     verify: "Verifikasi",
     verifying: "Memverifikasi...",
     mfaInvalidCode: "Kode tidak valid. Silakan coba lagi.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Siapkan autentikasi dua faktor untuk melanjutkan",
     mfaEnrollmentRequired:
       "Organisasi Anda mewajibkan autentikasi multi-faktor. Silakan atur MFA di pengaturan akun Anda.",
     mfaPolicyUnavailable: "Kebijakan MFA tidak dapat diperiksa. Silakan coba lagi sebentar lagi.",

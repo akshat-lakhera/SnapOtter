@@ -3485,6 +3485,11 @@ export const ko: TranslationKeys = {
       submit: "재정렬",
       submitBatch: "재정렬 ({count}개 파일)",
       progressLabel: "재정렬 중",
+      dragHint: "페이지를 드래그하여 재정렬",
+      resetOrder: "순서 초기화",
+      pageLabel: "{n}페이지",
+      orderTooLong:
+        "보낼 수 있는 개별 이동이 너무 많습니다. 초기화한 후 변경을 줄여 다시 시도하세요.",
     },
     "protect-pdf": {
       userPassword: "사용자 비밀번호",
@@ -4739,7 +4744,7 @@ export const ko: TranslationKeys = {
     verify: "확인",
     verifying: "확인 중...",
     mfaInvalidCode: "잘못된 코드입니다. 다시 시도해 주세요.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "계속하려면 2단계 인증을 설정하세요",
     mfaEnrollmentRequired: "조직에서 다단계 인증을 요구합니다. 계정 설정에서 MFA를 설정해 주세요.",
     mfaPolicyUnavailable: "MFA 정책을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     loginThrottled: "로그인 시도 횟수가 너무 많습니다. {minutes}분 후에 다시 시도해 주세요.",
