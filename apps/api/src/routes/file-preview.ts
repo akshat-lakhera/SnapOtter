@@ -7,7 +7,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
@@ -164,28 +164,44 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         await ensurePreviewDir();
         const inputPath = getStoredFilePath(file.storedName);
 
-        // Copy to a temp file with the original extension so LibreOffice
-        // can detect the format correctly from the extension.
-        // Restrict to an alphanumeric extension (no path separators) -- the
-        // original filename is user-controlled and feeds a filesystem path.
+        // Convert inside a per-request temp directory inside the preview dir.
+        // Multiple concurrent requests for the same uncached document each get
+        // their own input copy and output directory, so neither overwrites the
+        // other's input or picks up a partial output (#1319). Keeping the temp
+        // directory on the preview filesystem keeps the final rename atomic.
         const origExt = file.originalName.match(/\.[a-zA-Z0-9]+$/)?.[0] ?? "";
-        const tempInput = resolveWithinPreviewDir(`${id}-input${origExt}`);
-        await copyFile(inputPath, tempInput);
+        let tempDir: string | undefined;
 
         try {
-          await convertDocument(tempInput, previewDirPath(), "pdf", {
+          tempDir = await mkdtemp(join(previewDirPath(), `${id}-`));
+          const tempInput = join(tempDir, `input${origExt}`);
+          await copyFile(inputPath, tempInput);
+
+          await convertDocument(tempInput, tempDir, "pdf", {
             timeoutMs: (env.LIBREOFFICE_TIMEOUT_S || 120) * 1000,
           });
 
-          // convertDocument outputs next to the temp file; rename to cached path
-          const producedPath = resolveWithinPreviewDir(`${id}-input.pdf`);
-          await rename(producedPath, cachedPath);
+          // convertDocument outputs next to the temp file: input.pdf
+          const producedPath = join(tempDir, "input.pdf");
+          try {
+            await rename(producedPath, cachedPath);
+          } catch (renameErr) {
+            request.log.error({ err: renameErr, fileId: id, cachedPath }, "Document preview cache write failed");
+            void reportError(renameErr, {
+              source: "http",
+              route: "/api/v1/files/:id/preview",
+              method: "GET",
+              statusCode: 500,
+            });
+            return reply.status(500).send({ error: "Could not store preview" });
+          }
         } catch (err) {
           request.log.error({ err, fileId: id }, "Document preview generation failed");
           return reply.status(422).send({ error: "Could not generate document preview" });
         } finally {
-          // Clean up temp input copy
-          await rm(tempInput, { force: true }).catch(() => {});
+          if (tempDir) {
+            await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+          }
         }
 
         return reply
