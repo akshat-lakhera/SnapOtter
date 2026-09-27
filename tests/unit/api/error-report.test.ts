@@ -36,8 +36,13 @@ describe("classifyError", () => {
     expect(
       classifyError(Object.assign(new Error("bad png"), { name: "InputValidationError" })),
     ).toBe("expected");
+    expect(
+      classifyError(
+        Object.assign(new Error("bad png"), { name: "InputValidationError", statusCode: 400 }),
+      ),
+    ).toBe("expected");
   });
-  it("operational: connectivity, disk, perms, operational SafeError, marker-copied SafeError without kind", () => {
+  it("operational: connectivity, disk, perms, operational SafeError, marker-copied SafeError without kind, 5xx InputValidationError", () => {
     const pg = Object.assign(new Error("Failed query: q"), {
       cause: Object.assign(new Error("57P01"), { code: "57P01" }),
     });
@@ -49,6 +54,11 @@ describe("classifyError", () => {
     expect(classifyError(Object.assign(new Error("copied"), { isSafeMessage: true }))).toBe(
       "operational",
     );
+    expect(
+      classifyError(
+        Object.assign(new Error("engine down"), { name: "InputValidationError", statusCode: 503 }),
+      ),
+    ).toBe("operational");
   });
   it("operational: environmental database errors (auth, permission, resources), not query bugs", () => {
     // The deployment's DB is misconfigured or starved -- the operator's

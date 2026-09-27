@@ -49,7 +49,11 @@ export function classifyError(err: unknown, source?: ReportContext["source"]): E
   // InputValidationError (apps/api/src/modality/contract.ts) is a 400 the user
   // caused with a bad file/args. Tools throw it from processV2 inside the worker
   // (e.g. sprite-sheet), so it is expected wherever it surfaces, not only http.
-  if (e?.name === "InputValidationError") return "expected";
+  // 5xx status codes (such as ENGINE_UNAVAILABLE 503) indicate server-side failure
+  // and are operational faults, not expected user errors (#1330).
+  if (e?.name === "InputValidationError") {
+    return ((e as { statusCode?: number }).statusCode ?? 400) >= 500 ? "operational" : "expected";
+  }
   if (e && typeof e.message === "string" && /^(Canceled$|Timed out after )/.test(e.message)) {
     return "expected";
   }

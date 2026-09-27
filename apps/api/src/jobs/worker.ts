@@ -618,7 +618,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // input, not a server fault -- would otherwise flood error logs, so skip
       // them here; they still reach the OTel span recorded below.
       const isValidationError =
-        err instanceof Error && (err.name === "InputValidationError" || isToolInputError(err));
+        err instanceof Error &&
+        ((err.name === "InputValidationError" &&
+          ((err as { statusCode?: number }).statusCode ?? 400) < 500) ||
+          isToolInputError(err));
       if (!isCanceled && !isTimeout && !isValidationError) {
         logger.error({ err, jobId, toolId: data.toolId }, "tool job failed");
       }

@@ -242,6 +242,7 @@ export function registerOcrPdf(app: FastifyInstance) {
           return reply.status(err.statusCode).send({
             error: err.message,
             ...(err.details && { details: err.details }),
+            ...(err.code && { code: err.code }),
           });
         }
         const statusCode = ocrUploadErrorStatus(err);
