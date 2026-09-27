@@ -4,6 +4,8 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
+import { format } from "@/lib/format";
+import { previewFailureEncoder } from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
 
 const PROGRESS_MESSAGES = [
@@ -38,6 +40,8 @@ export function NonNativePreview({
   const { t } = useTranslation();
   const [state, setState] = useState<PreviewState>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Set when the server's ffmpeg lacks the encoder this preview needs (#1290).
+  const [missingEncoder, setMissingEncoder] = useState<string | null>(null);
   const [messageIndex, setMessageIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -50,6 +54,19 @@ export function NonNativePreview({
       abortRef.current?.abort();
     };
   }, [previewUrl]);
+
+  // A new file starts from scratch. Without this, the last file's preview, or
+  // an error naming the encoder it needed, stayed on screen for the next one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resets on a file change, which these props are
+  useEffect(() => {
+    abortRef.current?.abort();
+    setState("idle");
+    setMissingEncoder(null);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, [file, src, filename, modality]);
 
   const startMessageRotation = useCallback(() => {
     setMessageIndex(0);
@@ -71,6 +88,7 @@ export function NonNativePreview({
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let encoder: string | null = null;
 
     try {
       let fileToUpload = file;
@@ -93,6 +111,7 @@ export function NonNativePreview({
       });
 
       if (!response.ok) {
+        encoder = await previewFailureEncoder(response);
         throw new Error(`Preview generation failed: ${response.status}`);
       }
 
@@ -104,8 +123,11 @@ export function NonNativePreview({
 
       setPreviewUrl(url);
       setState("ready");
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
+    } catch {
+      // Checked on the signal, not the error: an abort while the error body
+      // was being read surfaces as an ordinary failure.
+      if (!controller.signal.aborted) {
+        setMissingEncoder(encoder);
         setState("error");
       }
     } finally {
@@ -177,7 +199,11 @@ export function NonNativePreview({
           <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
-          <p className="font-medium text-foreground mb-1">{t.toolPage.previewFailed}</p>
+          <p className="font-medium text-foreground mb-1">
+            {missingEncoder
+              ? format(t.toolPage.previewEncoderMissing, { encoder: missingEncoder })
+              : t.toolPage.previewFailed}
+          </p>
           <p className="text-sm text-muted-foreground mb-3">
             {filename}
             {fileSize != null && <> &middot; {formatFileSize(fileSize)}</>}
