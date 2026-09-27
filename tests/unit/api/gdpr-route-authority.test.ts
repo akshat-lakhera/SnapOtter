@@ -96,6 +96,9 @@ async function buildApp(): Promise<FastifyInstance> {
     deleteStoredFile: vi.fn(),
     deleteThumbnail: vi.fn(),
   }));
+  vi.doMock("../../../apps/api/src/routes/file-preview.js", () => ({
+    deletePreview: vi.fn(),
+  }));
   vi.doMock("../../../apps/api/src/lib/object-storage.js", () => ({ deletePrefix: vi.fn() }));
 
   const { registerGdprRoutes } = await import("../../../apps/api/src/routes/enterprise/gdpr.js");

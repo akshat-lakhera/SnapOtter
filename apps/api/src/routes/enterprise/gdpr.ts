@@ -11,6 +11,7 @@ import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { deleteStoredFile, deleteThumbnail } from "../../lib/file-storage.js";
 import { deletePrefix } from "../../lib/object-storage.js";
 import { canManageTargetRole, requirePermission } from "../../permissions.js";
+import { deletePreview } from "../file-preview.js";
 
 const purgeBodySchema = z.object({
   confirm: z.literal(true),
@@ -23,13 +24,14 @@ const purgeBodySchema = z.object({
 async function purgeUserData(userId: string): Promise<void> {
   // a. Delete user's library files from storage
   const userFileRows = await db
-    .select({ storedName: schema.userFiles.storedName })
+    .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
     .from(schema.userFiles)
     .where(eq(schema.userFiles.userId, userId));
 
   for (const file of userFileRows) {
     await deleteStoredFile(file.storedName);
     await deleteThumbnail(file.storedName);
+    await deletePreview(file.id);
   }
 
   // b. Delete userFiles rows

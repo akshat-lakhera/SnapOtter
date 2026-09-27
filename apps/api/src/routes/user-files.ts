@@ -36,6 +36,7 @@ import { decodeHeic } from "../lib/heic-converter.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
+import { deletePreview } from "./file-preview.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -717,6 +718,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       for (const row of deletableChainRows) {
         await deleteStoredFile(row.stored_name);
         await deleteThumbnail(row.stored_name);
+        await deletePreview(row.id);
       }
 
       // Batch DB delete

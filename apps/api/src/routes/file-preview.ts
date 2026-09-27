@@ -7,7 +7,17 @@
  */
 import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { access, copyFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
@@ -32,8 +42,34 @@ function previewDirPath(): string {
 
 async function ensurePreviewDir(): Promise<void> {
   if (previewDirReady) return;
-  await mkdir(previewDirPath(), { recursive: true });
+  const dir = previewDirPath();
+  await mkdir(dir, { recursive: true });
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        await rm(join(dir, entry.name), { recursive: true, force: true }).catch(() => {});
+      } else if (entry.isFile() && entry.name.includes(".part.")) {
+        await rm(join(dir, entry.name), { force: true }).catch(() => {});
+      }
+    }
+  } catch {
+    // Startup sweep is best-effort; ignore errors
+  }
   previewDirReady = true;
+}
+
+/**
+ * Remove cached preview files for a deleted user file (.mp4, .mp3, .pdf).
+ */
+export async function deletePreview(fileId: string): Promise<void> {
+  for (const ext of [".mp4", ".mp3", ".pdf"]) {
+    try {
+      await rm(previewPath(fileId, ext), { force: true });
+    } catch {
+      // Best effort; ignore failures if preview doesn't exist
+    }
+  }
 }
 
 /**
@@ -186,7 +222,10 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           try {
             await rename(producedPath, cachedPath);
           } catch (renameErr) {
-            request.log.error({ err: renameErr, fileId: id, cachedPath }, "Document preview cache write failed");
+            request.log.error(
+              { err: renameErr, fileId: id, cachedPath },
+              "Document preview cache write failed",
+            );
             void reportError(renameErr, {
               source: "http",
               route: "/api/v1/files/:id/preview",
@@ -234,41 +273,47 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
 
       try {
         if (isVideo) {
-          await runFfmpeg([
-            "-i",
-            inputPath,
-            "-t",
-            "30",
-            "-vf",
-            "scale='min(720,iw)':-2",
-            "-c:v",
-            softwareEncoder("h264"),
-            "-preset",
-            "ultrafast",
-            "-crf",
-            "28",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-movflags",
-            "+faststart",
-            "-y",
-            partialPath,
-          ]);
+          await runFfmpeg(
+            [
+              "-i",
+              inputPath,
+              "-t",
+              "30",
+              "-vf",
+              "scale='min(720,iw)':-2",
+              "-c:v",
+              softwareEncoder("h264"),
+              "-preset",
+              "ultrafast",
+              "-crf",
+              "28",
+              "-c:a",
+              "aac",
+              "-b:a",
+              "128k",
+              "-movflags",
+              "+faststart",
+              "-y",
+              partialPath,
+            ],
+            { timeoutMs: env.JOB_TIMEOUT_LONG_S * 1000 },
+          );
         } else {
-          await runFfmpeg([
-            "-i",
-            inputPath,
-            "-t",
-            "60",
-            "-c:a",
-            softwareEncoder("mp3"),
-            "-b:a",
-            "128k",
-            "-y",
-            partialPath,
-          ]);
+          await runFfmpeg(
+            [
+              "-i",
+              inputPath,
+              "-t",
+              "60",
+              "-c:a",
+              softwareEncoder("mp3"),
+              "-b:a",
+              "128k",
+              "-y",
+              partialPath,
+            ],
+            { timeoutMs: env.JOB_TIMEOUT_LONG_S * 1000 },
+          );
         }
       } catch (err) {
         await removePartialPreview(partialPath, request.log);
@@ -392,41 +437,47 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         await writeFile(inputPath, fileBuffer);
 
         if (isVideo) {
-          await runFfmpeg([
-            "-i",
-            inputPath,
-            "-t",
-            "30",
-            "-vf",
-            "scale='min(720,iw)':-2",
-            "-c:v",
-            softwareEncoder("h264"),
-            "-preset",
-            "ultrafast",
-            "-crf",
-            "28",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-movflags",
-            "+faststart",
-            "-y",
-            outputPath,
-          ]);
+          await runFfmpeg(
+            [
+              "-i",
+              inputPath,
+              "-t",
+              "30",
+              "-vf",
+              "scale='min(720,iw)':-2",
+              "-c:v",
+              softwareEncoder("h264"),
+              "-preset",
+              "ultrafast",
+              "-crf",
+              "28",
+              "-c:a",
+              "aac",
+              "-b:a",
+              "128k",
+              "-movflags",
+              "+faststart",
+              "-y",
+              outputPath,
+            ],
+            { timeoutMs: env.JOB_TIMEOUT_LONG_S * 1000 },
+          );
         } else {
-          await runFfmpeg([
-            "-i",
-            inputPath,
-            "-t",
-            "60",
-            "-c:a",
-            softwareEncoder("mp3"),
-            "-b:a",
-            "128k",
-            "-y",
-            outputPath,
-          ]);
+          await runFfmpeg(
+            [
+              "-i",
+              inputPath,
+              "-t",
+              "60",
+              "-c:a",
+              softwareEncoder("mp3"),
+              "-b:a",
+              "128k",
+              "-y",
+              outputPath,
+            ],
+            { timeoutMs: env.JOB_TIMEOUT_LONG_S * 1000 },
+          );
         }
 
         const outputBuffer = await readFile(outputPath);
