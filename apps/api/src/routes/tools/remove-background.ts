@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { removeBackground } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { BG_REMOVAL_MODELS, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
@@ -29,7 +29,7 @@ import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  model: z.string().optional(),
+  model: z.enum(BG_REMOVAL_MODELS).optional(),
   backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
   backgroundColor: z.string().optional(),
   gradientColor1: z.string().optional(),

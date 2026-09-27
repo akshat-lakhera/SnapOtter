@@ -177,6 +177,10 @@ def main():
 
     model = settings.get("model", "birefnet-general-lite")
     if model not in ALLOWED_MODELS:
+        print(
+            f"Warning: Unknown model '{model}', falling back to 'birefnet-general-lite'",
+            file=sys.stderr,
+        )
         model = "birefnet-general-lite"
 
     # Redirect stdout to stderr so library download/progress output

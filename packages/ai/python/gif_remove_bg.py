@@ -276,6 +276,7 @@ def main():
 
         model = settings.get("model", "u2net")
         if model not in ALLOWED_MODELS:
+            print(f"Warning: Unknown model '{model}', falling back to 'u2net'", file=sys.stderr)
             model = "u2net"
 
         emit_progress(3, "Reading frames")

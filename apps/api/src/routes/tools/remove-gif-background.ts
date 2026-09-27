@@ -4,7 +4,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { removeBackgroundAnimated } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { BG_REMOVAL_MODELS, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../../config.js";
@@ -23,7 +23,7 @@ import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  model: z.string().optional(),
+  model: z.enum(BG_REMOVAL_MODELS).optional(),
   outputFormat: z.enum(["webp", "gif", "apng"]).optional(),
   backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
   backgroundColor: z.string().optional(),
