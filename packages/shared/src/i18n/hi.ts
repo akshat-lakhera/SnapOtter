@@ -867,6 +867,26 @@ export const hi: TranslationKeys = {
       name: "PDF कंप्रेस",
       description: "PDF फ़ाइल का आकार घटाएँ",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF को 100 KB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 100 KB से कम करें",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF को 200 KB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 200 KB से कम करें",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF को 500 KB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 500 KB से कम करें",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF को 1 MB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 1 MB से कम करें",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF को 2 MB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 2 MB से कम करें",
+    },
     "rotate-pdf": {
       name: "PDF रोटेट",
       description: "PDF में पेज रोटेट करें",
@@ -1207,6 +1227,7 @@ export const hi: TranslationKeys = {
       submitBatch: "कंप्रेस करें ({count} फाइलें)",
       submitTarget: "{size} KB में कंप्रेस करें",
       resizedToFit: "{size} KB में फिट करने के लिए आकार {width} × {height} किया गया",
+      batchResized: "{total} में से {count} इमेज को {size} KB में फिट करने के लिए छोटा किया गया।",
       progressLabel: "कंप्रेस हो रहा है",
       original: "मूल: {size} KB",
       processed: "प्रोसेस्ड: {size} KB",
@@ -1828,6 +1849,14 @@ export const hi: TranslationKeys = {
         "डीप एन्हांस के लिए अपस्केल और एन्हांस बंडल चाहिए, जो इंस्टॉल नहीं है, इसलिए आपको सामान्य एन्हांसमेंट मिला।",
       deepEnhanceSkippedAnimated:
         "डीप एन्हांस एनिमेटेड इमेज पर काम नहीं करता, इसलिए हर फ़्रेम को सामान्य एन्हांसमेंट मिला।",
+      batchDeepEnhanceSkipped:
+        "{total} में से {count} इमेज पर डीप एन्हांस नहीं चला, इसलिए उन्हें सामान्य एन्हांसमेंट मिला।",
+      batchDeepEnhanceSkippedFailed:
+        "{total} में से {count} इमेज पर डीप एन्हांस विफल रहा, इसलिए उन्हें सामान्य एन्हांसमेंट मिला।",
+      batchDeepEnhanceSkippedUnavailable:
+        "{total} में से {count} इमेज पर डीप एन्हांस नहीं चला, क्योंकि अपस्केल और एन्हांस बंडल इंस्टॉल नहीं है।",
+      batchDeepEnhanceSkippedAnimated:
+        "डीप एन्हांस ने {total} में से {count} इमेज छोड़ दीं, क्योंकि वे एनिमेटेड हैं।",
     },
     "noise-removal": {
       off: "बंद",
@@ -3298,6 +3327,8 @@ export const hi: TranslationKeys = {
       printer: "प्रिंटर (सर्वोत्तम गुणवत्ता)",
       submit: "संपीड़ित करें",
       submitBatch: "संपीड़ित करें ({count} फ़ाइलें)",
+      submitTarget: "{size} में कंप्रेस करें",
+      batchMissed: "{total} में से {count} फाइलें {target} से कम नहीं हो सकीं।",
       progressLabel: "संपीड़ित हो रहा है",
       bestEffortHint:
         "अधिकतम संभव प्रयास. छवि-आधारित PDF इसके करीब पहुंचती हैं; केवल-टेक्स्ट वाली PDF शायद इस आकार तक न सिकुड़ें.",
@@ -3673,6 +3704,16 @@ export const hi: TranslationKeys = {
     previewFailed: "प्रीव्यू बनाना विफल रहा",
     previewEncoderMissing:
       "इस सर्वर के ffmpeg में {encoder} एनकोडर नहीं है, इसलिए प्रीव्यू नहीं बन सकता। अपने एडमिनिस्ट्रेटर से संपर्क करें।",
+    previewProgressMessages: [
+      "ऊदबिलाव वॉर्म-अप कर रहा है...",
+      "पिक्सेल पीसे जा रहे हैं...",
+      "कोडेक को सिखाया जा रहा है...",
+      "लगभग हो गया...",
+      "प्रीव्यू पक रहा है...",
+      "फ्रेम्स को मनाया जा रहा है...",
+      "नतीजे को चमकाया जा रहा है...",
+      "बस एक पल...",
+    ],
     previewNotAvailable: "प्रीव्यू उपलब्ध नहीं है",
     resultPreviewFailed: "परिणाम का प्रीव्यू लोड नहीं हो सका",
     resultPreviewFailedHint: "प्रोसेसिंग पूरी हो गई। फाइल सहेजने के लिए डाउनलोड बटन का उपयोग करें।",
@@ -4978,6 +5019,8 @@ export const hi: TranslationKeys = {
     imageControls: "पूर्वावलोकन नियंत्रण",
     zoomControls: "ज़ूम नियंत्रण",
     dragToReorder: "क्रम बदलने के लिए खींचें",
+    resultResizedToFit: "लक्ष्य आकार में फिट करने के लिए छोटा किया गया",
+    resultMissedTarget: "लक्ष्य आकार तक नहीं पहुंचा",
     reverseOrder: "क्रम उलटें",
     whiteBackground: "सफ़ेद बैकग्राउंड",
     blackBackground: "काला बैकग्राउंड",

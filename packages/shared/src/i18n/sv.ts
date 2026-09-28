@@ -1042,6 +1042,26 @@ export const sv: TranslationKeys = {
       name: "Komprimera PDF",
       description: "Minska PDF-filens storlek",
     },
+    "compress-pdf-to-100kb": {
+      name: "Komprimera PDF till 100 KB",
+      description: "Minska PDF-filens storlek till under 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Komprimera PDF till 200 KB",
+      description: "Minska PDF-filens storlek till under 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Komprimera PDF till 500 KB",
+      description: "Minska PDF-filens storlek till under 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Komprimera PDF till 1 MB",
+      description: "Minska PDF-filens storlek till under 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Komprimera PDF till 2 MB",
+      description: "Minska PDF-filens storlek till under 2 MB",
+    },
     "rotate-pdf": {
       name: "Rotera PDF",
       description: "Rotera sidor i en PDF",
@@ -1388,6 +1408,7 @@ export const sv: TranslationKeys = {
       submitBatch: "Komprimera ({count} filer)",
       submitTarget: "Komprimera till {size} KB",
       resizedToFit: "Förminskad till {width} × {height} för att rymmas inom {size} KB",
+      batchResized: "{count} av {total} bilder förminskades för att rymmas inom {size} KB.",
       progressLabel: "Komprimerar",
       original: "Original: {size} KB",
       processed: "Bearbetat: {size} KB",
@@ -2014,6 +2035,14 @@ export const sv: TranslationKeys = {
         "Djupförstärkning kräver paketet Uppskalning & Förstärkning, som inte är installerat, så du fick standardförstärkningen.",
       deepEnhanceSkippedAnimated:
         "Djupförstärkning fungerar inte på animerade bilder, så varje bildruta fick standardförstärkningen.",
+      batchDeepEnhanceSkipped:
+        "Djupförstärkningen kördes inte på {count} av {total} bilder, så de fick standardförstärkningen.",
+      batchDeepEnhanceSkippedFailed:
+        "Djupförstärkningen misslyckades på {count} av {total} bilder, så de fick standardförstärkningen.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Djupförstärkningen kördes inte på {count} av {total} bilder eftersom paketet Uppskalning & Förstärkning inte är installerat.",
+      batchDeepEnhanceSkippedAnimated:
+        "Djupförstärkningen hoppade över {count} av {total} bilder eftersom de är animerade.",
     },
     "noise-removal": {
       off: "Av",
@@ -3487,6 +3516,8 @@ export const sv: TranslationKeys = {
       printer: "Skrivare (bästa kvalitet)",
       submit: "Komprimera",
       submitBatch: "Komprimera ({count} filer)",
+      submitTarget: "Komprimera till {size}",
+      batchMissed: "{count} av {total} filer kom inte under {target}.",
       progressLabel: "Komprimerar",
       bestEffortHint:
         "Bästa möjliga maximum. Bildbaserade PDF:er kommer nära; PDF:er med enbart text krymper kanske inte till denna storlek.",
@@ -3865,6 +3896,16 @@ export const sv: TranslationKeys = {
     previewFailed: "Förhandsgranskning misslyckades",
     previewEncoderMissing:
       "Serverns ffmpeg saknar kodaren {encoder}, så förhandsvisningen kan inte skapas. Kontakta din administrator.",
+    previewProgressMessages: [
+      "Uttern värmer upp...",
+      "Tuggar pixlar...",
+      "Lär codecen tricks...",
+      "Nästan klart...",
+      "Förhandsgranskningen står och drar...",
+      "Övertalar bildrutorna...",
+      "Putsar resultatet...",
+      "Bara ett ögonblick...",
+    ],
     previewNotAvailable: "Förhandsvisning är inte tillgänglig",
     resultPreviewFailed: "Resultatets förhandsvisning kunde inte läsas in",
     resultPreviewFailedHint:
@@ -5188,6 +5229,8 @@ export const sv: TranslationKeys = {
     imageControls: "Förhandsvisningskontroller",
     zoomControls: "Zoomkontroller",
     dragToReorder: "Dra för att ändra ordning",
+    resultResizedToFit: "Förminskad för att rymmas inom målstorleken",
+    resultMissedTarget: "Nådde inte målstorleken",
     reverseOrder: "Omvänd ordning",
     whiteBackground: "Vit bakgrund",
     blackBackground: "Svart bakgrund",

@@ -1047,6 +1047,26 @@ export const it: TranslationKeys = {
       name: "Comprimi PDF",
       description: "Riduce le dimensioni del file PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Comprimi PDF a 100 KB",
+      description: "Riduci la dimensione del file PDF a meno di 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Comprimi PDF a 200 KB",
+      description: "Riduci la dimensione del file PDF a meno di 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Comprimi PDF a 500 KB",
+      description: "Riduci la dimensione del file PDF a meno di 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Comprimi PDF a 1 MB",
+      description: "Riduci la dimensione del file PDF a meno di 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Comprimi PDF a 2 MB",
+      description: "Riduci la dimensione del file PDF a meno di 2 MB",
+    },
     "rotate-pdf": {
       name: "Ruota PDF",
       description: "Ruota le pagine di un PDF",
@@ -1393,6 +1413,7 @@ export const it: TranslationKeys = {
       submitBatch: "Comprimi ({count} file)",
       submitTarget: "Comprimi a {size} KB",
       resizedToFit: "Ridimensionata a {width} × {height} per stare in {size} KB",
+      batchResized: "{count} immagini su {total} sono state ridimensionate per stare in {size} KB.",
       progressLabel: "Compressione in corso",
       original: "Originale: {size} KB",
       processed: "Elaborato: {size} KB",
@@ -2022,6 +2043,14 @@ export const it: TranslationKeys = {
         "Il miglioramento profondo richiede il pacchetto Ingrandimento e miglioramento, che non è installato, quindi hai ottenuto il miglioramento standard.",
       deepEnhanceSkippedAnimated:
         "Il miglioramento profondo non funziona sulle immagini animate, quindi ogni fotogramma ha ricevuto il miglioramento standard.",
+      batchDeepEnhanceSkipped:
+        "Il miglioramento profondo non è stato eseguito su {count} immagini su {total}, che hanno ricevuto il miglioramento standard.",
+      batchDeepEnhanceSkippedFailed:
+        "Il miglioramento profondo non è riuscito su {count} immagini su {total}, che hanno ricevuto il miglioramento standard.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Il miglioramento profondo non è stato eseguito su {count} immagini su {total} perché il pacchetto Ingrandimento e miglioramento non è installato.",
+      batchDeepEnhanceSkippedAnimated:
+        "Il miglioramento profondo ha saltato {count} immagini su {total} perché sono animate.",
     },
     "noise-removal": {
       off: "Disattivato",
@@ -3498,6 +3527,8 @@ export const it: TranslationKeys = {
       printer: "Stampante (migliore qualità)",
       submit: "Comprimi",
       submitBatch: "Comprimi ({count} file)",
+      submitTarget: "Comprimi a {size}",
+      batchMissed: "{count} file su {total} non sono scesi sotto {target}.",
       progressLabel: "Compressione",
       bestEffortHint:
         "Massimo possibile. I PDF basati su immagini si avvicinano; i PDF di solo testo potrebbero non ridursi a questa dimensione.",
@@ -3876,6 +3907,16 @@ export const it: TranslationKeys = {
     previewFailed: "Generazione dell'anteprima non riuscita",
     previewEncoderMissing:
       "Al ffmpeg di questo server manca l'encoder {encoder}, quindi non è possibile generare l'anteprima. Contatta l'amministratore.",
+    previewProgressMessages: [
+      "La lontra si sta scaldando...",
+      "Macinando pixel...",
+      "Istruendo il codec...",
+      "Ci siamo quasi...",
+      "L'anteprima è in infusione...",
+      "Convincendo i fotogrammi...",
+      "Lucidando il risultato...",
+      "Solo un attimo...",
+    ],
     previewNotAvailable: "Anteprima non disponibile",
     resultPreviewFailed: "Impossibile caricare l'anteprima del risultato",
     resultPreviewFailedHint:
@@ -5210,6 +5251,8 @@ export const it: TranslationKeys = {
     imageControls: "Controlli immagine",
     zoomControls: "Controlli zoom",
     dragToReorder: "Trascina per riordinare",
+    resultResizedToFit: "Ridimensionata per stare nella dimensione di destinazione",
+    resultMissedTarget: "Dimensione di destinazione non raggiunta",
     reverseOrder: "Inverti ordine",
     whiteBackground: "Sfondo bianco",
     blackBackground: "Sfondo nero",

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { load } from "js-yaml";
@@ -24,8 +25,12 @@ const PIN_SCRIPT = "scripts/rembg-test-pins.mjs";
 interface Step {
   run?: string;
   env?: Record<string, string>;
+  "continue-on-error"?: unknown;
 }
 interface Job {
+  "continue-on-error"?: unknown;
+  name?: string;
+  needs?: string | string[];
   if?: string;
   env?: Record<string, string>;
   strategy?: { matrix?: Record<string, unknown> };
@@ -83,6 +88,60 @@ describe("rembg-gated HR matting test in CI", () => {
     ]) {
       expect(block).toContain(pattern);
     }
+  });
+});
+
+/**
+ * The name branch protection requires (#1386). A matrix leg can't be required:
+ * when the path filter skips it, GitHub reports it under its unexpanded name
+ * ("AI Sidecar (rembg, ${{ matrix.pins }})"), so a PR that doesn't touch the
+ * AI Python would wait on it forever.
+ */
+const REQUIRED_NAME = "AI Sidecar (rembg)";
+
+describe("required rembg check", () => {
+  const entry = Object.entries(ci.jobs).find(([, job]) => job.name === REQUIRED_NAME);
+  const job = entry?.[1];
+
+  it("exists under the name branch protection requires", () => {
+    expect(entry, `no ci.yml job is named "${REQUIRED_NAME}"`).toBeDefined();
+  });
+
+  it("waits on every job that runs the rembg-gated test, and always reports", () => {
+    const needs = [job?.needs ?? []].flat();
+    for (const [name] of gatedJobs) expect(needs).toContain(name);
+    expect(job?.if).toBe("always()");
+  });
+
+  it("reads the result of the gated job", () => {
+    // The step checks one result; a second gated job would need its own.
+    expect(gatedJobs).toHaveLength(1);
+    const [gatedName] = gatedJobs[0];
+    expect(job?.steps?.[0]?.env?.RESULT).toBe(`\${{ needs.${gatedName}.result }}`);
+  });
+
+  it("can't be satisfied by a gated job that tolerates its own failure", () => {
+    // continue-on-error turns a failed leg into a success result upstream.
+    for (const [, gated] of gatedJobs) {
+      expect(gated["continue-on-error"]).toBeUndefined();
+      for (const step of gated.steps ?? []) expect(step["continue-on-error"]).toBeUndefined();
+    }
+  });
+
+  // Run the job's own step against each result the matrix can end in.
+  it.each([
+    ["success", 0],
+    ["skipped", 0],
+    ["failure", 1],
+    ["cancelled", 1],
+  ])("exits for %s with %i", (result, code) => {
+    const steps = job?.steps ?? [];
+    expect(steps).toHaveLength(1);
+    const run = spawnSync("bash", ["-e", "-c", steps[0].run ?? ""], {
+      env: { ...process.env, RESULT: result },
+      encoding: "utf8",
+    });
+    expect(run.status).toBe(code);
   });
 });
 

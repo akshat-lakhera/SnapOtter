@@ -1047,6 +1047,26 @@ export const de: TranslationKeys = {
       name: "PDF komprimieren",
       description: "PDF-Dateigröße reduzieren",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF auf 100 KB komprimieren",
+      description: "PDF-Dateigröße auf unter 100 KB reduzieren",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF auf 200 KB komprimieren",
+      description: "PDF-Dateigröße auf unter 200 KB reduzieren",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF auf 500 KB komprimieren",
+      description: "PDF-Dateigröße auf unter 500 KB reduzieren",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF auf 1 MB komprimieren",
+      description: "PDF-Dateigröße auf unter 1 MB reduzieren",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF auf 2 MB komprimieren",
+      description: "PDF-Dateigröße auf unter 2 MB reduzieren",
+    },
     "rotate-pdf": {
       name: "PDF drehen",
       description: "Seiten in einem PDF drehen",
@@ -1396,6 +1416,7 @@ export const de: TranslationKeys = {
       submitBatch: "Komprimieren ({count} Dateien)",
       submitTarget: "Auf {size} KB komprimieren",
       resizedToFit: "Auf {width} × {height} verkleinert, um in {size} KB zu passen",
+      batchResized: "{count} von {total} Bildern wurden verkleinert, um in {size} KB zu passen.",
       progressLabel: "Wird komprimiert",
       original: "Original: {size} KB",
       processed: "Verarbeitet: {size} KB",
@@ -2026,6 +2047,14 @@ export const de: TranslationKeys = {
         "Die Tiefenverbesserung braucht das Bundle Hochskalierung & Verbesserung, das nicht installiert ist. Sie sehen die Standardverbesserung.",
       deepEnhanceSkippedAnimated:
         "Die Tiefenverbesserung funktioniert nicht bei animierten Bildern, deshalb hat jedes Frame die Standardverbesserung bekommen.",
+      batchDeepEnhanceSkipped:
+        "Die Tiefenverbesserung lief bei {count} von {total} Bildern nicht, sie haben die Standardverbesserung erhalten.",
+      batchDeepEnhanceSkippedFailed:
+        "Die Tiefenverbesserung ist bei {count} von {total} Bildern fehlgeschlagen, sie haben die Standardverbesserung erhalten.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Die Tiefenverbesserung lief bei {count} von {total} Bildern nicht, weil das Bundle Hochskalierung & Verbesserung nicht installiert ist.",
+      batchDeepEnhanceSkippedAnimated:
+        "Die Tiefenverbesserung hat {count} von {total} Bildern übersprungen, weil sie animiert sind.",
     },
     "noise-removal": {
       off: "Aus",
@@ -3507,6 +3536,8 @@ export const de: TranslationKeys = {
       printer: "Drucker (beste Qualität)",
       submit: "Komprimieren",
       submitBatch: "Komprimieren ({count} Dateien)",
+      submitTarget: "Auf {size} komprimieren",
+      batchMissed: "{count} von {total} Dateien liegen nicht unter {target}.",
       progressLabel: "Wird komprimiert",
       bestEffortHint:
         "Bestmögliches Maximum. Bildbasierte PDFs kommen nah heran; reine Text-PDFs schrumpfen womöglich nicht auf diese Größe.",
@@ -3886,6 +3917,16 @@ export const de: TranslationKeys = {
     previewFailed: "Vorschauerzeugung fehlgeschlagen",
     previewEncoderMissing:
       "Dem ffmpeg dieses Servers fehlt der Encoder {encoder}, daher kann keine Vorschau erzeugt werden. Kontaktieren Sie Ihren Administrator.",
+    previewProgressMessages: [
+      "Der Otter wärmt sich auf...",
+      "Pixel werden zerkaut...",
+      "Der Codec lernt noch...",
+      "Fast geschafft...",
+      "Die Vorschau wird aufgebrüht...",
+      "Die Frames werden überredet...",
+      "Das Ergebnis wird poliert...",
+      "Einen Moment noch...",
+    ],
     previewNotAvailable: "Vorschau nicht verfügbar",
     resultPreviewFailed: "Ergebnisvorschau konnte nicht geladen werden",
     resultPreviewFailedHint:
@@ -5226,6 +5267,8 @@ export const de: TranslationKeys = {
     imageControls: "Vorschausteuerung",
     zoomControls: "Zoom-Steuerung",
     dragToReorder: "Ziehen zum Neuordnen",
+    resultResizedToFit: "Verkleinert, um in die Zielgröße zu passen",
+    resultMissedTarget: "Zielgröße nicht erreicht",
     reverseOrder: "Reihenfolge umkehren",
     whiteBackground: "Weißer Hintergrund",
     blackBackground: "Schwarzer Hintergrund",

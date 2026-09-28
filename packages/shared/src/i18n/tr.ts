@@ -1045,6 +1045,26 @@ export const tr: TranslationKeys = {
       name: "PDF Sıkıştır",
       description: "PDF dosya boyutunu küçült",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF'yi 100 KB'a Sıkıştır",
+      description: "PDF dosya boyutunu 100 KB'ın altına küçültün",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF'yi 200 KB'a Sıkıştır",
+      description: "PDF dosya boyutunu 200 KB'ın altına küçültün",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF'yi 500 KB'a Sıkıştır",
+      description: "PDF dosya boyutunu 500 KB'ın altına küçültün",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF'yi 1 MB'a Sıkıştır",
+      description: "PDF dosya boyutunu 1 MB'ın altına küçültün",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF'yi 2 MB'a Sıkıştır",
+      description: "PDF dosya boyutunu 2 MB'ın altına küçültün",
+    },
     "rotate-pdf": {
       name: "PDF Döndür",
       description: "PDF'deki sayfaları döndür",
@@ -1391,6 +1411,7 @@ export const tr: TranslationKeys = {
       submitBatch: "Sıkıştır ({count} dosya)",
       submitTarget: "{size} KB'a sıkıştır",
       resizedToFit: "{size} KB sınırına sığması için {width} × {height} boyutuna küçültüldü",
+      batchResized: "{total} görüntüden {count} tanesi {size} KB sınırına sığması için küçültüldü.",
       progressLabel: "Sıkıştırılıyor",
       original: "Orijinal: {size} KB",
       processed: "İşlenmiş: {size} KB",
@@ -2021,6 +2042,14 @@ export const tr: TranslationKeys = {
         "Derin İyileştirme için Büyütme ve İyileştirme paketi gerekiyor ama yüklü değil, bu yüzden standart iyileştirme uygulandı.",
       deepEnhanceSkippedAnimated:
         "Derin İyileştirme animasyonlu görüntülerde çalışmaz, bu yüzden her kareye standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkipped:
+        "Derin İyileştirme {total} görüntünün {count} tanesinde çalışmadı, bu yüzden standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkippedFailed:
+        "Derin İyileştirme {total} görüntünün {count} tanesinde başarısız oldu, bu yüzden standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Büyütme ve İyileştirme paketi yüklü olmadığı için Derin İyileştirme {total} görüntünün {count} tanesinde çalışmadı.",
+      batchDeepEnhanceSkippedAnimated:
+        "Derin İyileştirme, animasyonlu oldukları için {total} görüntünün {count} tanesini atladı.",
     },
     "noise-removal": {
       off: "Kapalı",
@@ -3495,6 +3524,8 @@ export const tr: TranslationKeys = {
       printer: "Yazıcı (en iyi kalite)",
       submit: "Sıkıştır",
       submitBatch: "Sıkıştır ({count} dosya)",
+      submitTarget: "{size}'a sıkıştır",
+      batchMissed: "{total} dosyadan {count} tanesi {target} altına inemedi.",
       progressLabel: "Sıkıştırılıyor",
       bestEffortHint:
         "Elden gelenin en fazlası. Görüntü tabanlı PDF'ler bu boyuta yaklaşır; yalnızca metin içeren PDF'ler bu boyuta küçülmeyebilir.",
@@ -3872,6 +3903,16 @@ export const tr: TranslationKeys = {
     previewFailed: "Önizleme oluşturulamadı",
     previewEncoderMissing:
       "Bu sunucudaki ffmpeg'de {encoder} kodlayıcısı yok, bu yüzden önizleme oluşturulamıyor. Yöneticinizle iletişime geçin.",
+    previewProgressMessages: [
+      "Su samuru ısınıyor...",
+      "Pikseller öğütülüyor...",
+      "Codec'e ders veriliyor...",
+      "Neredeyse bitti...",
+      "Önizleme demleniyor...",
+      "Kareler ikna ediliyor...",
+      "Sonuç parlatılıyor...",
+      "Bir saniye...",
+    ],
     previewNotAvailable: "Önizleme kullanılamıyor",
     resultPreviewFailed: "Sonuç önizlemesi yüklenemedi",
     resultPreviewFailedHint:
@@ -5201,6 +5242,8 @@ export const tr: TranslationKeys = {
     imageControls: "Önizleme kontrolleri",
     zoomControls: "Yakınlaştırma kontrolleri",
     dragToReorder: "Sıralamak için sürükleyin",
+    resultResizedToFit: "Hedef boyuta sığması için küçültüldü",
+    resultMissedTarget: "Hedef boyuta ulaşılamadı",
     reverseOrder: "Sırayı tersine çevir",
     whiteBackground: "Beyaz arka plan",
     blackBackground: "Siyah arka plan",

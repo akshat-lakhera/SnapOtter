@@ -1033,6 +1033,26 @@ export const th: TranslationKeys = {
       name: "บีบอัด PDF",
       description: "ลดขนาดไฟล์ PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "บีบอัด PDF ให้เหลือ 100 KB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "บีบอัด PDF ให้เหลือ 200 KB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "บีบอัด PDF ให้เหลือ 500 KB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "บีบอัด PDF ให้เหลือ 1 MB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "บีบอัด PDF ให้เหลือ 2 MB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 2 MB",
+    },
     "rotate-pdf": {
       name: "หมุน PDF",
       description: "หมุนหน้าใน PDF",
@@ -1368,6 +1388,7 @@ export const th: TranslationKeys = {
       submitBatch: "บีบอัด ({count} ไฟล์)",
       submitTarget: "บีบอัดให้เหลือ {size} KB",
       resizedToFit: "ปรับขนาดเป็น {width} × {height} เพื่อให้ไม่เกิน {size} KB",
+      batchResized: "ย่อขนาดภาพ {count} จาก {total} ภาพเพื่อให้ไม่เกิน {size} KB",
       progressLabel: "กำลังบีบอัด",
       original: "ต้นฉบับ: {size} KB",
       processed: "ประมวลผลแล้ว: {size} KB",
@@ -1981,6 +2002,14 @@ export const th: TranslationKeys = {
         "การปรับปรุงเชิงลึกต้องใช้ชุดขยายและปรับปรุง ซึ่งยังไม่ได้ติดตั้ง จึงได้รับการปรับปรุงแบบมาตรฐานแทน",
       deepEnhanceSkippedAnimated:
         "การปรับปรุงเชิงลึกใช้กับภาพเคลื่อนไหวไม่ได้ ทุกเฟรมจึงได้รับการปรับปรุงแบบมาตรฐาน",
+      batchDeepEnhanceSkipped:
+        "การปรับปรุงเชิงลึกไม่ได้ทำงานกับ {count} จาก {total} ภาพ จึงได้รับการปรับปรุงแบบมาตรฐานแทน",
+      batchDeepEnhanceSkippedFailed:
+        "การปรับปรุงเชิงลึกล้มเหลวกับ {count} จาก {total} ภาพ จึงได้รับการปรับปรุงแบบมาตรฐานแทน",
+      batchDeepEnhanceSkippedUnavailable:
+        "การปรับปรุงเชิงลึกไม่ได้ทำงานกับ {count} จาก {total} ภาพ เพราะยังไม่ได้ติดตั้งชุดขยายและปรับปรุง",
+      batchDeepEnhanceSkippedAnimated:
+        "การปรับปรุงเชิงลึกข้าม {count} จาก {total} ภาพ เพราะเป็นภาพเคลื่อนไหว",
     },
     "noise-removal": {
       off: "ปิด",
@@ -3449,6 +3478,8 @@ export const th: TranslationKeys = {
       printer: "เครื่องพิมพ์ (คุณภาพดีสุด)",
       submit: "บีบอัด",
       submitBatch: "บีบอัด ({count} ไฟล์)",
+      submitTarget: "บีบอัดให้เหลือ {size}",
+      batchMissed: "ไฟล์ {count} จาก {total} ไฟล์ไม่ลดลงต่ำกว่า {target}",
       progressLabel: "กำลังบีบอัด",
       bestEffortHint:
         "ค่าสูงสุดเท่าที่ทำได้ PDF ที่เป็นรูปภาพจะได้ขนาดใกล้เคียง ส่วน PDF ที่มีแต่ข้อความอาจย่อไม่ถึงขนาดนี้",
@@ -3823,6 +3854,16 @@ export const th: TranslationKeys = {
     previewFailed: "สร้างตัวอย่างไม่สำเร็จ",
     previewEncoderMissing:
       "ffmpeg บนเซิร์ฟเวอร์นี้ไม่มีตัวเข้ารหัส {encoder} จึงสร้างตัวอย่างไม่ได้ กรุณาติดต่อผู้ดูแลระบบ",
+    previewProgressMessages: [
+      "นากกำลังวอร์มอัป...",
+      "กำลังบดพิกเซล...",
+      "กำลังสอนโคเดก...",
+      "อีกนิดเดียว...",
+      "กำลังชงตัวอย่าง...",
+      "กำลังเกลี้ยกล่อมเฟรม...",
+      "กำลังขัดเงาผลลัพธ์...",
+      "รอสักครู่...",
+    ],
     previewNotAvailable: "ไม่มีตัวอย่างให้แสดง",
     resultPreviewFailed: "โหลดตัวอย่างผลลัพธ์ไม่สำเร็จ",
     resultPreviewFailedHint: "การประมวลผลเสร็จสิ้นแล้ว ใช้ปุ่มดาวน์โหลดเพื่อบันทึกไฟล์",
@@ -5124,6 +5165,8 @@ export const th: TranslationKeys = {
     imageControls: "การควบคุมการแสดงตัวอย่าง",
     zoomControls: "ตัวควบคุมการซูม",
     dragToReorder: "ลากเพื่อจัดเรียงใหม่",
+    resultResizedToFit: "ย่อขนาดให้ไม่เกินขนาดเป้าหมาย",
+    resultMissedTarget: "ไม่ถึงขนาดเป้าหมาย",
     reverseOrder: "กลับลำดับ",
     whiteBackground: "พื้นหลังสีขาว",
     blackBackground: "พื้นหลังสีดำ",

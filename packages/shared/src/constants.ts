@@ -834,6 +834,9 @@ const BASE_TOOLS: Tool[] = [
     modality: "image",
     acceptedInputs: IMAGE_INPUTS,
     executionHint: "fast",
+    // The tool's name and localized description never say "vectorize", so
+    // searching the id word only matched the id (#1327).
+    keywords: ["vectorize"],
   },
   {
     id: "gif-tools",
@@ -1389,6 +1392,9 @@ const BASE_TOOLS: Tool[] = [
     // "long": the target-size mode runs several ghostscript passes; async keeps
     // the request off the sync window and surfaces a real progress bar.
     executionHint: "long",
+    // The compress-pdf-to-N presets repeat these words in every keyword; without
+    // its own, the base tool lost "shrink pdf" to them (#1070, same as #1322).
+    keywords: ["compress pdf", "shrink pdf", "reduce pdf size", "pdf compressor"],
   },
   {
     id: "rotate-pdf",
@@ -2731,6 +2737,14 @@ export const PYTHON_SIDECAR_TOOLS = [
   "background-replace",
   "blur-background",
 ] as const;
+
+/**
+ * X-File-Notes key meaning "this note applies to every file with a result".
+ * Sent instead of one identical entry per file, so a batch where every file
+ * carries the same note (Deep Enhance unavailable, say) keeps a small header
+ * however many files it has (#1303).
+ */
+export const FILE_NOTES_ALL_FILES = "*";
 
 /**
  * Allowed model identifiers for background removal.

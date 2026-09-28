@@ -1,3 +1,4 @@
+import { SafeError } from "@snapotter/shared";
 import { Play, RefreshCw, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -7,17 +8,6 @@ import { formatFileSize } from "@/lib/download";
 import { format } from "@/lib/format";
 import { previewFailureEncoder } from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
-
-const PROGRESS_MESSAGES = [
-  "Warming up the otter...",
-  "Crunching pixels...",
-  "Teaching the codec...",
-  "Almost there...",
-  "Brewing the preview...",
-  "Convincing the frames...",
-  "Polishing the output...",
-  "Just a moment...",
-];
 
 type PreviewState = "idle" | "generating" | "ready" | "error";
 
@@ -71,7 +61,9 @@ export function NonNativePreview({
   const startMessageRotation = useCallback(() => {
     setMessageIndex(0);
     intervalRef.current = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % PROGRESS_MESSAGES.length);
+      // Wrapped at render against the live locale's array, so a locale switch
+      // mid-rotation can't leave the index past its end.
+      setMessageIndex((prev) => prev + 1);
     }, 2500);
   }, []);
 
@@ -94,6 +86,15 @@ export function NonNativePreview({
       let fileToUpload = file;
       if (!fileToUpload && src) {
         const res = await fetch(src);
+        // An expired or missing result answers with an error page; don't send
+        // that body off to be transcoded as the user's media (#1286). No
+        // statusCode on purpose: a status here is about fetching the source,
+        // not about the preview request, and must not be read as one.
+        if (!res.ok) {
+          throw new SafeError(`Media preview could not fetch its source (HTTP ${res.status})`, {
+            code: `preview-source-http-${res.status}`,
+          });
+        }
         const blob = await res.blob();
         fileToUpload = new File([blob], filename, { type: blob.type });
       }
@@ -166,6 +167,7 @@ export function NonNativePreview({
 
   // Generating state: progress bar + rotating messages
   if (state === "generating") {
+    const previewMessages = t.toolPage.previewProgressMessages;
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center p-8 max-w-xs w-full">
@@ -185,7 +187,9 @@ export function NonNativePreview({
               )}
             />
           </div>
-          <p className="text-sm text-muted-foreground">{PROGRESS_MESSAGES[messageIndex]}</p>
+          <p className="text-sm text-muted-foreground">
+            {previewMessages[messageIndex % previewMessages.length]}
+          </p>
         </div>
       </div>
     );

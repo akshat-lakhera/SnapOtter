@@ -1045,6 +1045,26 @@ export const vi: TranslationKeys = {
       name: "Nén PDF",
       description: "Giảm dung lượng tệp PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Nén PDF xuống 100 KB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Nén PDF xuống 200 KB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Nén PDF xuống 500 KB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Nén PDF xuống 1 MB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Nén PDF xuống 2 MB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 2 MB",
+    },
     "rotate-pdf": {
       name: "Xoay PDF",
       description: "Xoay các trang trong PDF",
@@ -1388,6 +1408,7 @@ export const vi: TranslationKeys = {
       submitBatch: "Nén ({count} tệp)",
       submitTarget: "Nén xuống {size} KB",
       resizedToFit: "Đã thu nhỏ xuống {width} × {height} để vừa trong {size} KB",
+      batchResized: "Đã thu nhỏ {count}/{total} ảnh để vừa trong {size} KB.",
       progressLabel: "Đang nén",
       original: "Gốc: {size} KB",
       processed: "Đã xử lý: {size} KB",
@@ -2013,6 +2034,14 @@ export const vi: TranslationKeys = {
         "Nâng cao sâu cần gói Phóng to & Nâng cao, nhưng gói này chưa được cài đặt, nên bạn nhận được bản nâng cao tiêu chuẩn.",
       deepEnhanceSkippedAnimated:
         "Nâng cao sâu không hoạt động với ảnh động, nên mọi khung hình đều nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkipped:
+        "Nâng cao sâu không chạy trên {count} trong {total} ảnh, nên các ảnh đó nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkippedFailed:
+        "Nâng cao sâu thất bại trên {count} trong {total} ảnh, nên các ảnh đó nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Nâng cao sâu không chạy trên {count} trong {total} ảnh vì gói Phóng to & Nâng cao chưa được cài đặt.",
+      batchDeepEnhanceSkippedAnimated:
+        "Nâng cao sâu đã bỏ qua {count} trong {total} ảnh vì chúng là ảnh động.",
     },
     "noise-removal": {
       off: "Tắt",
@@ -3487,6 +3516,8 @@ export const vi: TranslationKeys = {
       printer: "Máy in (chất lượng tốt nhất)",
       submit: "Nén",
       submitBatch: "Nén ({count} tệp)",
+      submitTarget: "Nén xuống {size}",
+      batchMissed: "{count}/{total} tệp không xuống dưới {target}.",
       progressLabel: "Đang nén",
       bestEffortHint:
         "Mức tối đa trong khả năng. PDF chứa hình ảnh sẽ đạt gần mức này; PDF chỉ có văn bản có thể không thu nhỏ được xuống kích thước này.",
@@ -3864,6 +3895,16 @@ export const vi: TranslationKeys = {
     previewFailed: "Tạo xem trước thất bại",
     previewEncoderMissing:
       "ffmpeg trên máy chủ này thiếu bộ mã hóa {encoder} nên không thể tạo xem trước. Liên hệ quản trị viên.",
+    previewProgressMessages: [
+      "Rái cá đang khởi động...",
+      "Đang nghiền điểm ảnh...",
+      "Đang dạy codec...",
+      "Sắp xong rồi...",
+      "Đang pha bản xem trước...",
+      "Đang thuyết phục các khung hình...",
+      "Đang đánh bóng kết quả...",
+      "Chờ một chút...",
+    ],
     previewNotAvailable: "Không có bản xem trước",
     resultPreviewFailed: "Không tải được bản xem trước kết quả",
     resultPreviewFailedHint: "Đã xử lý xong. Sử dụng nút tải xuống để lưu tệp.",
@@ -5179,6 +5220,8 @@ export const vi: TranslationKeys = {
     imageControls: "Điều khiển xem trước",
     zoomControls: "Điều khiển thu phóng",
     dragToReorder: "Kéo để sắp xếp lại",
+    resultResizedToFit: "Đã thu nhỏ để vừa kích thước mục tiêu",
+    resultMissedTarget: "Chưa đạt kích thước mục tiêu",
     reverseOrder: "Đảo ngược thứ tự",
     whiteBackground: "Nền trắng",
     blackBackground: "Nền đen",

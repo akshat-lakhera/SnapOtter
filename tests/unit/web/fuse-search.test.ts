@@ -25,6 +25,19 @@ describe("app fuzzy search finds converters by variation", () => {
   });
 });
 
+describe("the normalizer keeps the words that name a tool (#1327)", () => {
+  // "convert image" used to normalize to "image", which ranked the five
+  // compress-image-to-N-kb presets first and Convert Image sixth.
+  it.each([
+    ["convert image", "convert"],
+    ["Convert Image", "convert"],
+    ["vectorize", "vectorize"],
+    ["jpgtopng", "jpg-to-png"],
+  ])("%s leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+});
+
 describe("a base tool outranks its presets on its own name (#1322)", () => {
   // The five compress-image-to-N-kb presets carry many "compress ..."
   // keywords; the base tool had none, so a bare "compress" ranked every
@@ -42,6 +55,24 @@ describe("a base tool outranks its presets on its own name (#1322)", () => {
     ["compress to 20 kb", "compress-image-to-20kb"],
     ["20kb", "compress-image-to-20kb"],
   ])("a sized query %s still leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+});
+
+describe("compress-pdf outranks its size presets (#1070)", () => {
+  it.each([
+    ["compress pdf", "compress-pdf"],
+    ["shrink pdf", "compress-pdf"],
+    ["reduce pdf size", "compress-pdf"],
+  ])("%s leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+
+  it.each([
+    ["compress pdf to 100kb", "compress-pdf-to-100kb"],
+    ["compress pdf to 1 mb", "compress-pdf-to-1mb"],
+    ["pdf under 2mb", "compress-pdf-to-2mb"],
+  ])("a sized query %s leads with %s", (q, id) => {
     expect(search(q)[0]).toBe(id);
   });
 });

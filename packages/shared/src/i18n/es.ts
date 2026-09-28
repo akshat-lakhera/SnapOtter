@@ -1031,6 +1031,26 @@ export const es: TranslationKeys = {
       name: "Comprimir PDF",
       description: "Reduce el tamaño del archivo PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Comprimir PDF a 100 KB",
+      description: "Reduce el tamaño del archivo PDF a menos de 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Comprimir PDF a 200 KB",
+      description: "Reduce el tamaño del archivo PDF a menos de 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Comprimir PDF a 500 KB",
+      description: "Reduce el tamaño del archivo PDF a menos de 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Comprimir PDF a 1 MB",
+      description: "Reduce el tamaño del archivo PDF a menos de 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Comprimir PDF a 2 MB",
+      description: "Reduce el tamaño del archivo PDF a menos de 2 MB",
+    },
     "rotate-pdf": {
       name: "Rotar PDF",
       description: "Rota las páginas de un PDF",
@@ -1379,6 +1399,7 @@ export const es: TranslationKeys = {
       submitBatch: "Comprimir ({count} archivos)",
       submitTarget: "Comprimir a {size} KB",
       resizedToFit: "Redimensionada a {width} × {height} para caber en {size} KB",
+      batchResized: "{count} de {total} imágenes se redujeron para caber en {size} KB.",
       progressLabel: "Comprimiendo",
       original: "Original: {size} KB",
       processed: "Procesado: {size} KB",
@@ -2008,6 +2029,14 @@ export const es: TranslationKeys = {
         "La mejora profunda necesita el paquete de Escalado y mejora, que no está instalado, así que se aplicó la mejora estándar.",
       deepEnhanceSkippedAnimated:
         "La mejora profunda no funciona con imágenes animadas, así que cada fotograma recibió la mejora estándar.",
+      batchDeepEnhanceSkipped:
+        "La mejora profunda no se ejecutó en {count} de {total} imágenes, así que recibieron la mejora estándar.",
+      batchDeepEnhanceSkippedFailed:
+        "La mejora profunda falló en {count} de {total} imágenes, así que recibieron la mejora estándar.",
+      batchDeepEnhanceSkippedUnavailable:
+        "La mejora profunda no se ejecutó en {count} de {total} imágenes porque el paquete de Escalado y mejora no está instalado.",
+      batchDeepEnhanceSkippedAnimated:
+        "La mejora profunda omitió {count} de {total} imágenes porque son animadas.",
     },
     "noise-removal": {
       off: "Desactivado",
@@ -3485,6 +3514,8 @@ export const es: TranslationKeys = {
       printer: "Impresora (mejor calidad)",
       submit: "Comprimir",
       submitBatch: "Comprimir ({count} archivos)",
+      submitTarget: "Comprimir a {size}",
+      batchMissed: "{count} de {total} archivos no bajaron de {target}.",
       progressLabel: "Comprimiendo",
       bestEffortHint:
         "Máximo posible. Los PDF basados en imágenes se acercan; los PDF de solo texto quizá no se reduzcan a este tamaño.",
@@ -3863,6 +3894,16 @@ export const es: TranslationKeys = {
     previewFailed: "Error al generar la vista previa",
     previewEncoderMissing:
       "Al ffmpeg de este servidor le falta el codificador {encoder}, así que no se puede generar la vista previa. Contacta a tu administrador.",
+    previewProgressMessages: [
+      "La nutria está entrando en calor...",
+      "Triturando píxeles...",
+      "Enseñando al códec...",
+      "Ya casi...",
+      "Preparando la vista previa...",
+      "Convenciendo a los fotogramas...",
+      "Puliendo el resultado...",
+      "Un momento...",
+    ],
     previewNotAvailable: "Vista previa no disponible",
     resultPreviewFailed: "No se pudo cargar la vista previa del resultado",
     resultPreviewFailedHint:
@@ -5201,6 +5242,8 @@ export const es: TranslationKeys = {
     imageControls: "Controles de vista previa",
     zoomControls: "Controles de zoom",
     dragToReorder: "Arrastrar para reordenar",
+    resultResizedToFit: "Reducida para caber en el tamaño objetivo",
+    resultMissedTarget: "No alcanzó el tamaño objetivo",
     reverseOrder: "Invertir orden",
     whiteBackground: "Fondo blanco",
     blackBackground: "Fondo negro",
