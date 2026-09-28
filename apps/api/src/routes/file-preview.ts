@@ -6,7 +6,7 @@
  * MP3 (audio), or PDF (documents) previews and caches them on disk.
  */
 import { randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { createReadStream, type Dirent } from "node:fs";
 import {
   access,
   copyFile,
@@ -16,6 +16,7 @@ import {
   readFile,
   rename,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,33 +31,67 @@ import { db, schema } from "../db/index.js";
 import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { getStoredFilePath } from "../lib/file-storage.js";
+import { logger } from "../lib/logger.js";
 import { hasEffectivePermission, requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 
 const PREVIEW_DIR = ".previews";
-let previewDirReady = false;
+let previewDirReady: Promise<void> | undefined;
 
 function previewDirPath(): string {
   return join(env.FILES_STORAGE_PATH, PREVIEW_DIR);
 }
 
-async function ensurePreviewDir(): Promise<void> {
-  if (previewDirReady) return;
-  const dir = previewDirPath();
-  await mkdir(dir, { recursive: true });
+/**
+ * How old a temp dir or `.part` file must be before the startup sweep treats it
+ * as orphaned. Replicas can share one DATA_DIR, so a fresh entry may belong to
+ * another live process; only something older than the longest preview run can
+ * be assumed dead. A limit of 0 means unlimited, so fall back to a day.
+ */
+function staleAfterMs(): number {
+  const encodeS = env.JOB_TIMEOUT_LONG_S || 86_400;
+  const convertS = env.LIBREOFFICE_TIMEOUT_S || 120;
+  return Math.max(encodeS, convertS) * 1000;
+}
+
+async function sweepOrphanedPreviewWork(dir: string): Promise<void> {
+  const cutoff = Date.now() - staleAfterMs();
+  let entries: Dirent[];
   try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        await rm(join(dir, entry.name), { recursive: true, force: true }).catch(() => {});
-      } else if (entry.isFile() && entry.name.includes(".part.")) {
-        await rm(join(dir, entry.name), { force: true }).catch(() => {});
-      }
-    }
-  } catch {
-    // Startup sweep is best-effort; ignore errors
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    logger.warn({ err, dir }, "Could not list preview directory for cleanup");
+    return;
   }
-  previewDirReady = true;
+  for (const entry of entries) {
+    const isTempDir = entry.isDirectory();
+    const isPartial = entry.isFile() && entry.name.includes(".part.");
+    if (!isTempDir && !isPartial) continue;
+    const path = join(dir, entry.name);
+    try {
+      if ((await stat(path)).mtimeMs > cutoff) continue;
+      await rm(path, { recursive: isTempDir, force: true });
+    } catch (err) {
+      logger.warn({ err, path }, "Could not remove orphaned preview work");
+    }
+  }
+}
+
+/**
+ * Create the preview dir and sweep leftovers from killed runs once per process
+ * (#1320). Concurrent first requests share one promise, so none of them can
+ * sweep while another has already started writing.
+ */
+export function ensurePreviewDir(): Promise<void> {
+  previewDirReady ??= (async () => {
+    const dir = previewDirPath();
+    await mkdir(dir, { recursive: true });
+    await sweepOrphanedPreviewWork(dir);
+  })().catch((err) => {
+    previewDirReady = undefined;
+    throw err;
+  });
+  return previewDirReady;
 }
 
 /**
@@ -64,11 +99,10 @@ async function ensurePreviewDir(): Promise<void> {
  */
 export async function deletePreview(fileId: string): Promise<void> {
   for (const ext of [".mp4", ".mp3", ".pdf"]) {
-    try {
-      await rm(previewPath(fileId, ext), { force: true });
-    } catch {
-      // Best effort; ignore failures if preview doesn't exist
-    }
+    const path = previewPath(fileId, ext);
+    await rm(path, { force: true }).catch((err) => {
+      logger.warn({ err, fileId, path }, "Could not remove cached preview");
+    });
   }
 }
 

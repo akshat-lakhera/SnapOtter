@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +14,9 @@ const config = vi.hoisted(() => ({
 vi.mock("../../../apps/api/src/config.js", () => ({
   env: config,
 }));
+
+const loggerMock = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn() }));
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: { select: vi.fn() },
@@ -66,5 +69,54 @@ describe("deletePreview (#1320)", () => {
   it("is idempotent when preview files do not exist", async () => {
     const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
     await expect(deletePreview("nonexistent-file-id")).resolves.toBeUndefined();
+  });
+});
+
+describe("ensurePreviewDir startup sweep (#1320)", () => {
+  async function makeStale(path: string): Promise<void> {
+    const old = new Date(Date.now() - (config.JOB_TIMEOUT_LONG_S + 60) * 1000);
+    await utimes(path, old, old);
+  }
+
+  it("removes stale temp dirs and .part files but keeps cached previews", async () => {
+    await mkdir(join(previewDir, "doc-abc123"));
+    await writeFile(join(previewDir, "doc-abc123", "input.docx"), "x");
+    await writeFile(join(previewDir, "vid.1234.part.mp4"), "partial");
+    await writeFile(join(previewDir, "vid.mp4"), "cached");
+    await makeStale(join(previewDir, "doc-abc123"));
+    await makeStale(join(previewDir, "vid.1234.part.mp4"));
+    await makeStale(join(previewDir, "vid.mp4"));
+
+    const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
+    await ensurePreviewDir();
+
+    expect(existsSync(join(previewDir, "doc-abc123"))).toBe(false);
+    expect(existsSync(join(previewDir, "vid.1234.part.mp4"))).toBe(false);
+    expect(existsSync(join(previewDir, "vid.mp4"))).toBe(true);
+  });
+
+  it("leaves fresh temp work alone, since another replica may still be writing it", async () => {
+    await mkdir(join(previewDir, "doc-live01"));
+    await writeFile(join(previewDir, "aud.5678.part.mp3"), "partial");
+
+    const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
+    await ensurePreviewDir();
+
+    expect(existsSync(join(previewDir, "doc-live01"))).toBe(true);
+    expect(existsSync(join(previewDir, "aud.5678.part.mp3"))).toBe(true);
+  });
+
+  it("sweeps once per process, even for concurrent first calls", async () => {
+    const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
+    const first = ensurePreviewDir();
+    const second = ensurePreviewDir();
+    expect(second).toBe(first);
+    await first;
+
+    // Work created after the sweep survives a later call, stale or not.
+    await mkdir(join(previewDir, "doc-after1"));
+    await makeStale(join(previewDir, "doc-after1"));
+    await ensurePreviewDir();
+    expect(existsSync(join(previewDir, "doc-after1"))).toBe(true);
   });
 });
