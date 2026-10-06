@@ -156,12 +156,15 @@ verify_cached_debs() {
       unknown=$((unknown + 1))
       continue
     fi
-    sum="$(sha256sum "$f")"
+    if ! sum="$(sha256sum "$f" 2>/dev/null)"; then
+      echo "::warning::could not read $f"
+      sum=""
+    fi
     sum="${sum%% *}"
-    if grep -qxF "${name} ${sum}" <<< "$records"; then
+    if [ -n "$sum" ] && grep -qxF "${name} ${sum}" <<< "$records"; then
       matched=$((matched + 1))
     else
-      sudo rm -f "$f"
+      sudo rm -f "$f" || echo "::warning::could not delete $f"
       dropped=$((dropped + 1))
       # A good copy downloaded under the same name is new to the cache.
       restored="$(grep -vxF "$base" <<< "$restored")" || true
@@ -192,6 +195,7 @@ finish() {
     echo "::warning::dpkg-query listed nothing; not caching any .deb archives"
   fi
   for f in "$archive_dir"/*.deb; do
+    [ -e "$f" ] || continue
     name="${f##*/}"
     base="${name%.deb}"
     # apt names archives name_version_arch.deb with ':' (epochs) as %3a.
@@ -200,12 +204,14 @@ finish() {
       kept=$((kept + 1))
       grep -qxF "$name" <<< "$restored" || fresh=$((fresh + 1))
     else
-      sudo rm -f "$f"
+      sudo rm -f "$f" || echo "::warning::could not delete $f"
     fi
   done
-  sudo rm -rf "$archive_dir/partial" "$archive_dir/lock"
+  sudo rm -rf "$archive_dir/partial" "$archive_dir/lock" ||
+    echo "::warning::could not clear apt's partial and lock files"
   # apt wrote the archives as root; actions/cache runs as the runner user.
-  sudo chown -R "$(id -u):$(id -g)" "$archive_dir"
+  sudo chown -R "$(id -u):$(id -g)" "$archive_dir" ||
+    echo "::warning::could not change ownership of apt archive dir"
   echo "apt cache: keeping ${kept} .deb archives, ${fresh} of them new to the cache"
   echo "fresh=${fresh}" >> "${GITHUB_OUTPUT:-/dev/null}"
 }
