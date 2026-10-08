@@ -1,10 +1,21 @@
 import { detectFaces } from "@snapotter/ai";
-import { SMART_CROP_FACE_PRESETS } from "@snapotter/shared";
+import {
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  SMART_CROP_FACE_PRESETS,
+  ToolInputError,
+} from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
+
+// Sharp re-reads the buffers this tool hands between its own steps, and refuses one
+// over its default input limit (0x3FFF x 0x3FFF) with a bare Error that reaches the
+// worker as a server fault. Refuse the request instead (#2064).
+const MAX_STEP_PIXELS = 0x3fff * 0x3fff;
+
+const dimension = z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION);
 
 const settingsSchema = z
   .object({
@@ -17,8 +28,8 @@ const settingsSchema = z
         return v;
       }),
     strategy: z.enum(["attention", "entropy"]).default("attention"),
-    width: z.number().int().positive().optional(),
-    height: z.number().int().positive().optional(),
+    width: dimension.optional(),
+    height: dimension.optional(),
     padding: z.number().int().min(0).max(50).default(0),
     facePreset: z
       .enum(["closeup", "head-shoulders", "upper-body", "half-body"])
@@ -27,8 +38,24 @@ const settingsSchema = z
     threshold: z.number().int().min(0).max(255).default(30),
     padToSquare: z.boolean().default(false),
     padColor: z.string().default("#ffffff"),
-    targetSize: z.number().int().positive().optional(),
+    targetSize: dimension.optional(),
     quality: z.number().int().min(1).max(100).optional(),
+  })
+  .superRefine((s, ctx) => {
+    // With no padding the pair is already inside the per-field ceiling, so only a
+    // padded subject resize (also the no-face fallback of face mode) makes an
+    // intermediate bigger than the output. Trim ignores width and height.
+    if (s.mode === "trim" || s.padding === 0) return;
+    const scale = 1 + s.padding / 100;
+    const w = Math.round((s.width ?? 1080) * scale);
+    const h = Math.round((s.height ?? 1080) * scale);
+    if (w * h > MAX_STEP_PIXELS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["width"],
+        message: `With ${s.padding}% padding the crop is resized to ${w} x ${h}, over the ${MAX_STEP_PIXELS} pixel limit`,
+      });
+    }
   })
   .transform((s) => ({
     ...s,
@@ -165,6 +192,13 @@ async function processTrim(
     const w = trimmed.info.width;
     const h = trimmed.info.height;
     const target = settings.targetSize || Math.max(w, h);
+    // The padded square is re-read below; one past Sharp's input limit would throw a
+    // bare Error. Only reachable without a targetSize, since that is capped by the schema.
+    if (target * target > MAX_STEP_PIXELS) {
+      throw new ToolInputError(
+        `The trimmed image is too large to pad to a square (${target} x ${target} pixels). Set targetSize to ${MAX_RESIZE_OUTPUT_DIMENSION} or less.`,
+      );
+    }
     const padR = Math.round(Number.parseInt(settings.padColor.slice(1, 3), 16));
     const padG = Math.round(Number.parseInt(settings.padColor.slice(3, 5), 16));
     const padB = Math.round(Number.parseInt(settings.padColor.slice(5, 7), 16));
