@@ -55,7 +55,7 @@ import {
 import { appUrl } from "@/lib/app-url";
 import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
-import { generatePassword } from "@/lib/generate-password";
+import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
 import { logout } from "@/lib/logout";
 import { passwordErrorMessage } from "@/lib/password-errors";
 import { changedSettings, writableSettings } from "@/lib/settings-payload";
@@ -1490,6 +1490,22 @@ export function PeopleSection() {
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [availableRoles, setAvailableRoles] = useState<RoleEntry[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
+  // The server's minimum password length, so Generate can meet it (#2027). Like
+  // the team and role lists it only feeds a convenience. The key is readable
+  // with security:manage, so an admin without it gets a 403 or a settings map
+  // that leaves it out, and Generate keeps its default length until the server
+  // names the minimum in a refusal.
+  const [policyMinLength, setPolicyMinLength] = useState<unknown>(undefined);
+
+  const loadPolicy = useCallback(() => {
+    apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      .then((data) => setPolicyMinLength(data.settings?.passwordMinLength))
+      .catch((err) => {
+        // A 403 is the expected answer for an admin without access.
+        if (err instanceof ApiError && err.status === 403) return;
+        console.warn("Password policy read failed; Generate uses the default length", err);
+      });
+  }, []);
 
   const loadTeams = useCallback(async () => {
     try {
@@ -1531,7 +1547,8 @@ export function PeopleSection() {
     loadUsers();
     loadTeams();
     loadRoles();
-  }, [loadUsers, loadTeams, loadRoles]);
+    loadPolicy();
+  }, [loadUsers, loadTeams, loadRoles, loadPolicy]);
 
   useEffect(() => {
     loadAll();
@@ -1578,6 +1595,11 @@ export function PeopleSection() {
         setActionMsg({ type: "success", text: t.settings.people.createSuccess });
         await loadUsers();
       } catch (err) {
+        // The refusal names the minimum even when the policy read didn't, so
+        // the next Generate meets it (#2027).
+        if (err instanceof ApiError && typeof err.body.minLength === "number") {
+          setPolicyMinLength(err.body.minLength);
+        }
         setAddError(
           (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
             apiErrorMessage(
@@ -1919,7 +1941,7 @@ export function PeopleSection() {
             <button
               type="button"
               onClick={() => {
-                const pw = generatePassword();
+                const pw = generatePassword(passwordLengthFor(policyMinLength));
                 setNewPassword(pw);
                 setShowGeneratedPw(true);
                 setPwCopy(null);
