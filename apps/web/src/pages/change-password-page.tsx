@@ -4,7 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { clearToken, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { generatePassword } from "@/lib/generate-password";
-import { passwordErrorMessage } from "@/lib/password-errors";
+import { passwordErrorMessages } from "@/lib/password-errors";
 
 /**
  * Trigger the browser's "Save Password" prompt by submitting a real form
@@ -44,12 +44,42 @@ function triggerBrowserPasswordSave(username: string, password: string) {
   // The form.submit() causes a full page navigation to "/", so no cleanup needed.
 }
 
+/**
+ * What happens once the server has changed the password. None of it may be
+ * reported as a failed change: the password is already different, so telling
+ * the user it failed sends their next attempt in with a wrong current
+ * password (#1569). Blocked storage is ignored; a form the browser won't
+ * submit falls back to a plain navigation to the app.
+ */
+function finishPasswordChange(newPassword: string) {
+  // Read the name before the write: a full quota throws on setItem, and the
+  // browser must still be offered the password under the right username.
+  let username = "admin";
+  try {
+    username = localStorage.getItem("snapotter-username") || username;
+  } catch {
+    // Storage blocked: keep the default.
+  }
+  try {
+    localStorage.setItem("snapotter-welcome", "1");
+  } catch {
+    // Storage blocked or full (private window): the welcome flag is a nicety.
+  }
+  try {
+    // Trigger browser password save prompt via real form submission + navigation
+    triggerBrowserPasswordSave(username, newPassword);
+  } catch (err) {
+    console.warn("Save-password form failed; navigating to the app instead", err);
+    window.location.assign(appUrl("/"));
+  }
+}
+
 export function ChangePasswordPage() {
   const { t } = useTranslation();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<string[]>([]);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showGenerated, setShowGenerated] = useState(false);
@@ -63,14 +93,15 @@ export function ChangePasswordPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
+    setErrors([]);
 
     if (newPassword !== confirmPassword) {
-      setError(t.changePassword.passwordsMismatch);
+      setErrors([t.changePassword.passwordsMismatch]);
       return;
     }
 
     setLoading(true);
+    let changed = false;
     try {
       const res = await fetch(appUrl("/api/auth/change-password"), {
         method: "POST",
@@ -88,24 +119,24 @@ export function ChangePasswordPage() {
           setSessionEnded(true);
           return;
         }
-        const message = passwordErrorMessage(t, res.status, data);
-        if (!message) {
+        const messages = passwordErrorMessages(t, res.status, data);
+        if (messages.length === 0) {
           console.warn("Password change failed", { status: res.status, code: data.code });
         }
-        setError(message ?? t.changePassword.failedError);
+        setErrors(messages.length > 0 ? messages : [t.changePassword.failedError]);
         return;
       }
-
-      localStorage.setItem("snapotter-welcome", "1");
-      // Trigger browser password save prompt via real form submission + navigation
-      const username = localStorage.getItem("snapotter-username") || "admin";
-      triggerBrowserPasswordSave(username, newPassword);
-      return; // navigation happens inside triggerBrowserPasswordSave
+      changed = true;
     } catch {
-      setError(t.changePassword.failedError);
+      setErrors([t.changePassword.failedError]);
+      return;
     } finally {
-      setLoading(false);
+      // After a success the page is about to navigate; a live button would let a
+      // second click resend the old current password.
+      if (!changed) setLoading(false);
     }
+
+    finishPasswordChange(newPassword); // navigates away
   };
 
   return (
@@ -209,10 +240,19 @@ export function ChangePasswordPage() {
                 </a>
               </p>
             )}
-            {error && (
+            {errors.length === 1 && (
               <p role="alert" className="text-sm text-destructive">
-                {error}
+                {errors[0]}
               </p>
+            )}
+            {errors.length > 1 && (
+              <div role="alert" className="text-sm text-destructive">
+                <ul className="list-disc ps-5 space-y-1">
+                  {errors.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              </div>
             )}
             <button
               type="submit"

@@ -1119,6 +1119,7 @@ describe("Admin user-management guards", () => {
     expect(JSON.parse(res.body)).toMatchObject({
       code: "VALIDATION_ERROR",
       rule: "minLength",
+      rules: ["minLength", "uppercase", "digit"],
       minLength: 8,
       error: expect.stringMatching(/^Password must/),
     });
@@ -1203,6 +1204,51 @@ describe("Admin user-management guards", () => {
     });
   });
 
+  // A password that breaks several rules names all of them, so the user can fix
+  // them in one go instead of one retry per rule (#1569). `rule` stays the first.
+  it("change-password lists every broken rule, first one in `rule`", async () => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, "abc");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        code: "VALIDATION_ERROR",
+        rule: "minLength",
+        minLength: 8,
+        rules: ["minLength", "uppercase", "digit", "special"],
+      });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  it("change-password sends a one-element rules list when a single rule is broken", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "alllower1");
+
+    const body = JSON.parse(res.body);
+    expect(body).toMatchObject({ rule: "uppercase", rules: ["uppercase"] });
+    // The length is only echoed when the length rule is among the broken ones.
+    expect(body).not.toHaveProperty("minLength");
+  });
+
+  it("change-password names all five rules, in a fixed order, for a password that meets none", async () => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      // A single Thai letter: no case, not a digit, not a symbol, and too short.
+      const res = await sendChangePassword(user, "\u0e01");
+
+      expect(JSON.parse(res.body)).toMatchObject({
+        rule: "minLength",
+        rules: ["minLength", "uppercase", "lowercase", "digit", "special"],
+      });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
   it("change-password names the special-character rule when the policy requires one", async () => {
     // The user first: createUser's own password has no special character.
     const user = await loggedInUser();
@@ -1276,7 +1322,10 @@ describe("Admin user-management guards", () => {
     });
 
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body)).toMatchObject({ rule: "controlCharacter" });
+    expect(JSON.parse(res.body)).toMatchObject({
+      rule: "controlCharacter",
+      rules: ["controlCharacter"],
+    });
   });
 
   it("lets a user sign in with the non-Latin password they just set", async () => {
@@ -1427,6 +1476,7 @@ describe("Admin user-management guards", () => {
     expect(JSON.parse(res.body)).toMatchObject({
       code: "VALIDATION_ERROR",
       rule: "minLength",
+      rules: ["minLength"],
       minLength: 8,
       error: expect.stringMatching(/^Password must/),
     });
