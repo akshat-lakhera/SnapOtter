@@ -428,6 +428,101 @@ describe("SPA fallback disambiguation (#1275)", () => {
     }
   });
 
+  // The forced change-password page submits a real form POST to the app root so the
+  // browser offers to save the new password (#2088). That must land on the app, not
+  // on the plain-text 404 every other non-GET miss gets.
+  it("sends the save-password form POST to the app root back to the shell", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: "username=admin&password=new-Password1",
+      });
+      expect(response.statusCode).toBe(303);
+      expect(response.headers.location).toBe("/");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does the same when a urlencoded body parser is registered (SAML on)", async () => {
+    const app = Fastify();
+    // saml.ts adds this parser on the root instance, which the not-found handler shares.
+    app.addContentTypeParser(
+      "application/x-www-form-urlencoded",
+      { parseAs: "string" },
+      (_request, body, done) => done(null, body),
+    );
+    await registerStatic(app, root);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: "username=admin&password=new-Password1",
+      });
+      expect(response.statusCode).toBe(303);
+      expect(response.headers.location).toBe("/");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps the deployment path when it sends that POST back to the shell", async () => {
+    const basePath = "/snapotter";
+    config.BASE_PATH = basePath;
+    const app = Fastify({ rewriteUrl: (request) => stripBasePath(request.url ?? "/", basePath) });
+    await registerStatic(app, root);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `${basePath}/`,
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: "username=admin&password=x",
+      });
+      expect(response.statusCode).toBe(303);
+      expect(response.headers.location).toBe(`${basePath}/`);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("only redirects a POST: other methods on the app root still 404", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      for (const method of ["PUT", "DELETE", "PATCH"] as const) {
+        const response = await app.inject({ method, url: "/" });
+        expect(response.statusCode, method).toBe(404);
+        expect(response.headers["content-type"], method).toContain("text/plain");
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("still 404s a POST to anywhere but the app root", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      for (const url of ["/index.html", "/image/resize", "/files/"]) {
+        const response = await app.inject({
+          method: "POST",
+          url,
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          payload: "a=b",
+        });
+        expect(response.statusCode, url).toBe(404);
+        expect(response.headers["content-type"], url).toContain("text/plain");
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
   it("answers non-GET misses with 404 instead of the shell", async () => {
     const app = Fastify();
     await registerStatic(app, root);
