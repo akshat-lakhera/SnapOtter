@@ -11,8 +11,11 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../../apps/api/src/config.js";
 import { getObjectBuffer, putObject } from "../../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -318,8 +321,8 @@ describe("passport-photo/generate", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("returns 422 when jobId workspace does not exist", async () => {
-    const res = await app.inject({
+  function generateFor(jobId: string) {
+    return app.inject({
       method: "POST",
       url: "/api/v1/tools/image/passport-photo/generate",
       headers: {
@@ -327,7 +330,7 @@ describe("passport-photo/generate", () => {
         "content-type": "application/json",
       },
       payload: {
-        jobId: "00000000-0000-0000-0000-000000000000",
+        jobId,
         filename: "test.png",
         countryCode: "US",
         landmarks: {
@@ -344,9 +347,33 @@ describe("passport-photo/generate", () => {
         imageHeight: 150,
       },
     });
+  }
 
-    // 422 because the workspace directory won't exist for this fake jobId
-    expect(res.statusCode).toBe(422);
+  it("answers 410 ANALYSIS_EXPIRED when the analyze output is gone (#1674)", async () => {
+    // No analyze ever stored test_nobg.png for this job, the same state as
+    // one whose output expired between analyze and generate.
+    const res = await generateFor(randomUUID());
+
+    expect(res.statusCode).toBe(410);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("ANALYSIS_EXPIRED");
+    // The raw ENOENT carried the absolute data path; nothing of it leaks.
+    expect(res.body).not.toMatch(/ENOENT|outputs\//);
+  });
+
+  it("lets a storage fault reading the analyze output reach the error handler (#1674)", async () => {
+    // A directory where the PNG should be makes the read fail with EISDIR:
+    // the object exists but can't be read, which is the server's fault.
+    // Built on disk directly, since putObject refuses a nested key. Assumes
+    // the local backend, which every integration run uses.
+    const jobId = randomUUID();
+    await mkdir(join(env.WORKSPACE_PATH, "outputs", jobId, "test_nobg.png"), { recursive: true });
+
+    const res = await generateFor(jobId);
+
+    // Status only: the test server skips the production error handler
+    // (#1243), so the body is Fastify's default. The unit suite pins ours.
+    expect(res.statusCode).toBe(500);
   });
 });
 
