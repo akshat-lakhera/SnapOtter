@@ -53,6 +53,7 @@ import {
   checkBinaryOverrides,
   probeFailureLevel,
 } from "../lib/binary-overrides.js";
+import { allFailedFault, type BatchFault } from "../lib/engine-unavailable.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
 import { friendlyError, sharedFailureReason } from "../lib/errors.js";
@@ -1076,6 +1077,9 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   let failedAtStep: number | null = null;
   let failedStepCanceled = false;
   let failError = "";
+  // The failed step's status, code and hint, kept on this file's row so a
+  // pipeline batch can tell one engine fault behind every file (#1627).
+  let failFault: { code?: string; details?: string; httpStatus?: number } = {};
 
   for (let i = 0; i < totalSteps; i++) {
     const stepId = `${data.jobId}-s${i}`;
@@ -1090,7 +1094,18 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     if (row.status !== "completed") {
       failedAtStep = i;
       failedStepCanceled = row.status === "canceled";
-      failError = (row.error as { message?: string } | null)?.message ?? `Step ${i + 1} failed`;
+      const stepError = row.error as {
+        message?: string;
+        code?: string;
+        details?: string;
+        httpStatus?: number;
+      } | null;
+      failError = stepError?.message ?? `Step ${i + 1} failed`;
+      failFault = {
+        ...(stepError?.code && { code: stepError.code }),
+        ...(stepError?.details && { details: stepError.details }),
+        ...(stepError?.httpStatus !== undefined && { httpStatus: stepError.httpStatus }),
+      };
       break;
     }
 
@@ -1208,14 +1223,20 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
 
     await db
       .update(schema.jobs)
-      .set({ status: "failed", completedAt: new Date(), error: { message: errorMsg } })
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        error: { message: errorMsg, ...failFault },
+      })
       .where(eq(schema.jobs.id, data.jobId));
 
+    // The failed frame rewrites the row's error, so it carries the fault too.
     await updateSingleFileProgress({
       jobId: progressJobId,
       phase: "failed",
       percent: 0,
       error: errorMsg,
+      ...failFault,
     });
 
     // Batch progress (pipeline-batch only)
@@ -1513,6 +1534,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   const settings = (data.settings ?? {}) as {
     flowChildCount?: number;
     fileIndexMap?: number[];
+    preFailureFaults?: unknown;
   };
   const flowChildCount = settings.flowChildCount ?? data.totalFiles ?? 0;
   // Flow index -> original upload index. Pre-failed uploads never became flow
@@ -1528,8 +1550,12 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     filename: string;
     outputRef?: string;
     error?: string;
+    code?: string;
     notes?: BatchFileNotes;
   }> = [];
+  // Each failed child's status and code as its row kept them, so one engine
+  // fault behind every file can answer like the upload-time path (#1627).
+  const childFaults: BatchFault[] = [];
 
   let canceledChildren = 0;
   for (let i = 0; i < flowChildCount; i++) {
@@ -1538,6 +1564,8 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
     if (!row) {
       manifest.push({ index: i, filename: `file-${i}`, error: "Child job row not found" });
+      // Counted without a code, so it can't be folded into a shared fault.
+      childFaults.push({ error: "Child job row not found" });
       continue;
     }
 
@@ -1554,9 +1582,27 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       });
     } else {
       if (row.status === "canceled") canceledChildren++;
-      const errorMsg = (row.error as { message?: string } | null)?.message ?? "Processing failed";
+      const rowError = row.error as {
+        message?: string;
+        code?: string;
+        details?: string;
+        httpStatus?: number;
+      } | null;
+      const errorMsg = rowError?.message ?? "Processing failed";
       const inputFilename = row.inputRefs?.[0]?.split("/").pop() ?? `file-${i}`;
-      manifest.push({ index: i, filename: inputFilename, error: friendlyError(errorMsg) });
+      const error = friendlyError(errorMsg);
+      manifest.push({
+        index: i,
+        filename: inputFilename,
+        error,
+        ...(rowError?.code && { code: rowError.code }),
+      });
+      childFaults.push({
+        error,
+        ...(rowError?.httpStatus !== undefined && { statusCode: rowError.httpStatus }),
+        ...(rowError?.code && { code: rowError.code }),
+        ...(rowError?.details && { details: rowError.details }),
+      });
     }
   }
 
@@ -1609,18 +1655,33 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   }
 
   if (successEntries.length === 0) {
-    // One shared reason (the workspace cap on every output write) becomes
-    // the batch's own message and a blank-name entry the client reads as
-    // the run's error, appended after the per-file entries like the
+    // Every file failing on one engine fault (the same 5xx code) is the
+    // batch's failure: its status, code and hint lead, the same answer the
+    // route gives when that fault strikes at upload time (#1432, #1627).
+    // The pre-failures count only when the route sent every one of them.
+    const fault = allFailedFault(
+      settings.preFailureFaults,
+      totalFiles - flowChildCount,
+      childFaults,
+      flowChildCount,
+    );
+    // Otherwise one shared reason (the workspace cap on every output write)
+    // becomes the batch's own message and a blank-name entry the client reads
+    // as the run's error, appended after the per-file entries like the
     // packaging failure's; a mixed bag keeps the generic summary (#1161).
-    const shared = sharedFailureReason(counters.errors);
+    const shared = fault
+      ? fault.details
+        ? `${fault.error}: ${fault.details}`
+        : fault.error
+      : sharedFailureReason(counters.errors);
     await failBatchJob({
       jobId: data.jobId,
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
       errors: shared ? [...counters.errors, { filename: "", error: shared }] : counters.errors,
-      message: shared ?? "All files failed processing",
+      message: fault?.error ?? shared ?? "All files failed processing",
+      ...(fault && { code: fault.code }),
     });
     return {
       outputRefs: [],
@@ -1628,7 +1689,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       contentType: "application/json",
       originalSize: 0,
       processedSize: 0,
-      resultPayload: { manifest, allFailed: true },
+      resultPayload: { manifest, allFailed: true, ...(fault && { fault }) },
     };
   }
 

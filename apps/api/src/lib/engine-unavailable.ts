@@ -65,6 +65,38 @@ export function sendInputValidationError(
   });
 }
 
+/**
+ * One file's failure as a batch weighs it: the message plus, when the failure
+ * carried them, its HTTP status, code and operator hint. A pre-failure and a
+ * worker-side failure both reduce to this, so they can be judged together.
+ */
+export interface BatchFault {
+  error: string;
+  statusCode?: number;
+  code?: string;
+  details?: string;
+}
+
+/**
+ * The batch finalize's verdict when no file succeeded: the shared server
+ * fault across the files that failed before the flow and the ones that
+ * failed in it (#1627). The pre-failures come from the route through job
+ * data; when that list doesn't account for every file that never reached
+ * the flow (a job queued by an older build), or the child faults don't
+ * account for every flow child, there's no verdict rather than one formed
+ * without every file in view.
+ */
+export function allFailedFault(
+  preFailureFaults: unknown,
+  preFailedCount: number,
+  childFaults: BatchFault[],
+  flowChildCount: number,
+): ReturnType<typeof sharedServerFault> {
+  const pre = Array.isArray(preFailureFaults) ? (preFailureFaults as BatchFault[]) : [];
+  if (pre.length !== preFailedCount || childFaults.length !== flowChildCount) return null;
+  return sharedServerFault([...pre, ...childFaults]);
+}
+
 /** What a batch keeps about a file that failed input preparation, besides its message. */
 export function preFailureFaultFields(err: InputValidationError): {
   statusCode: number;
@@ -85,7 +117,7 @@ export function preFailureFaultFields(err: InputValidationError): {
  * generic 422 (#1432). Anything mixed, or any 4xx, returns null.
  */
 export function sharedServerFault(
-  failures: Array<{ error: string; statusCode?: number; code?: string; details?: string }>,
+  failures: BatchFault[],
 ): { statusCode: number; code: string; error: string; details?: string } | null {
   const first = failures[0];
   if (!first?.code || first.statusCode === undefined || first.statusCode < 500) return null;
