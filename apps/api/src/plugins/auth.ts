@@ -121,19 +121,25 @@ async function validatePasswordStrength(password: string): Promise<PasswordRuleF
   const requireDigit = await getSettingString("passwordRequireDigit", "true");
   const requireSpecial = await getSettingString("passwordRequireSpecial", "false");
 
+  // The rules mean "has an uppercase letter / a lowercase letter / a digit /
+  // punctuation, a symbol or a space" in any script, so a Russian or Arabic
+  // password isn't rejected for a rule it visibly meets (#1568). Special is an
+  // allowlist of those three classes rather than "not a letter or number", which
+  // would also pass invisible and control characters (a zero-width space, a tab,
+  // NUL) that nobody can see or that the login page can't send.
   // The three default-on rules are off only when stored as exactly "false",
   // which is how the Security tab reads them. Anything else a row might hold
   // ("TRUE", "1", a value an API client wrote before settings were validated in
   // #618, a hand edit) fails closed instead of showing a switch that's on while
   // enforcing nothing (#2026). Special defaults off, so it stays on only for
   // "true", matching its switch.
-  if (requireUpper !== "false" && !/[A-Z]/.test(password))
+  if (requireUpper !== "false" && !/\p{Lu}/u.test(password))
     return { message: "Password must contain an uppercase letter", rule: "uppercase" };
-  if (requireLower !== "false" && !/[a-z]/.test(password))
+  if (requireLower !== "false" && !/\p{Ll}/u.test(password))
     return { message: "Password must contain a lowercase letter", rule: "lowercase" };
-  if (requireDigit !== "false" && !/\d/.test(password))
+  if (requireDigit !== "false" && !/\p{Nd}/u.test(password))
     return { message: "Password must contain a digit", rule: "digit" };
-  if (requireSpecial === "true" && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password))
+  if (requireSpecial === "true" && !/[\p{P}\p{S}\p{Zs}]/u.test(password))
     return { message: "Password must contain a special character", rule: "special" };
 
   return null;
