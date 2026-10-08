@@ -22,6 +22,30 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // every other test runs against the real implementation.
 const guardedWriteFault = vi.hoisted(() => ({ target: null as string | null }));
 
+// Runs once right after the real write of an output under `prefix`, standing in
+// for a cancel that arrives while the worker is already past the handler.
+const outputWriteHook = vi.hoisted(() => ({
+  prefix: null as string | null,
+  after: null as (() => Promise<void>) | null,
+}));
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: async (key: string, data: Buffer) => {
+      await actual.putObject(key, data);
+      if (outputWriteHook.prefix && key.startsWith(outputWriteHook.prefix)) {
+        const run = outputWriteHook.after;
+        outputWriteHook.prefix = null;
+        outputWriteHook.after = null;
+        await run?.();
+      }
+    },
+  };
+});
+
 vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
   return {
@@ -41,6 +65,7 @@ import {
   requestCancel,
   startCancelListener,
   stopCancelListener,
+  wasUserCanceled,
 } from "../../../apps/api/src/jobs/cancel.js";
 import {
   createRedisSubscriberConnection,
@@ -56,7 +81,7 @@ import {
 import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
-import { putObject } from "../../../apps/api/src/lib/object-storage.js";
+import { listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory.js";
@@ -64,12 +89,14 @@ import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory
 const passthroughSchema = { parse: (v: unknown) => v } as never;
 
 interface RunSettings {
-  mode: "fast" | "slow";
+  mode: "fast" | "slow" | "ignore-abort";
   tag: string;
 }
 
 // Behavior keyed on settings: fast returns instantly, slow waits on the
-// worker's abort signal, so a cancel has a real running target. Every
+// worker's abort signal, so a cancel has a real running target. ignore-abort
+// stands in for a handler that never reads the signal (Erase Object, #2092):
+// it notices the abort only to finish a beat later and return a result anyway. Every
 // invocation records its tag, so "this run never started" is a positive
 // assertion instead of a timing guess.
 const invoked: string[] = [];
@@ -105,6 +132,26 @@ registerToolProcessFn({
           { once: true },
         );
       });
+    }
+    if (mode === "ignore-abort") {
+      const signal = ctx?.signal;
+      if (!signal) throw new Error("wt-single-cancel requires an abort signal");
+      if (!signal.aborted) {
+        await new Promise<void>((resolve) => {
+          // Bounded like the slow mode, so a lost cancel fails this test instead of
+          // hanging the shard until the job timeout.
+          const timer = setTimeout(resolve, 20_000);
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true },
+          );
+        });
+      }
+      await delay(200);
     }
     return { buffer: inputBuffer, filename, contentType: "image/png" };
   },
@@ -175,7 +222,7 @@ async function createOwner(): Promise<string> {
 }
 
 interface EnqueueOpts {
-  mode: "fast" | "slow";
+  mode: "fast" | "slow" | "ignore-abort";
   tag: string;
   clientJobId?: string;
   userId?: string | null;
@@ -363,6 +410,43 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     const frame = await terminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
+  });
+
+  it("does not save a result that finished after the cancel landed (#2092)", async () => {
+    const clientJobId = randomUUID();
+    const { jobId } = await enqueueSingleRun({
+      mode: "ignore-abort",
+      tag: "ignore-abort",
+      clientJobId,
+    });
+    await waitFor(async () => (invoked.includes("ignore-abort") ? true : undefined));
+
+    expect(await requestCancel(clientJobId)).toBe(true);
+
+    // The handler returned a result after the abort. The worker must settle
+    // canceled and write nothing, instead of completing and saving it.
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    expect((await terminalRow(clientJobId)).status).toBe("canceled");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+  });
+
+  it("settles canceled when the cancel lands while the output is being written (#2092)", async () => {
+    // Past the first guard, so only the re-check before the library auto-save
+    // can stop this one.
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    outputWriteHook.prefix = `outputs/${jobId}/`;
+    outputWriteHook.after = async () => {
+      expect(await requestCancel(clientJobId)).toBe(true);
+      await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+    };
+    await enqueueSingleRun({ mode: "fast", tag: "cancel-mid-write", clientJobId, jobId });
+
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    expect((await terminalRow(clientJobId)).status).toBe("canceled");
   });
 
   it("surfaces an active cancel to the sync window as the Canceled rejection", async () => {
