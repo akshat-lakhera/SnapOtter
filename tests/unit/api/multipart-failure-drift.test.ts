@@ -49,6 +49,25 @@ describe("multipart read failures go through multipartFailure (#1341)", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("calls the helper once per multipart read, not once per file (#1660)", () => {
+    // A file with two routes passed the check above on its first route's
+    // call while the second kept a hand-written 400. Counting can't pair
+    // each read with its catch, so a file with spare helper calls
+    // (pdf-to-image.ts shares its catches) could still hide one.
+    // Only comments that open a line are stripped, so a "/*" or "//"
+    // inside a string (an "image/*" glob, a URL) can't swallow code.
+    const calls = (src: string, name: string) =>
+      src
+        .replace(/^\s*\/\*[\s\S]*?\*\//gm, "")
+        .replace(/^\s*\/\/.*$/gm, "")
+        .split(`${name}(`).length - 1;
+    const offenders = files
+      .filter(({ name }) => !(name in HANDLED_ELSEWHERE))
+      .filter(({ src }) => calls(src, "multipartFailure") < calls(src, "request.parts"))
+      .map(({ name }) => name);
+    expect(offenders).toEqual([]);
+  });
+
   it("the handled-elsewhere list has no stale entries", () => {
     for (const [name, how] of Object.entries(HANDLED_ELSEWHERE)) {
       const file = files.find((f) => f.name === name);
