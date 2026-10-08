@@ -286,7 +286,13 @@ const WARM = { [QPDF]: "sha-qpdf-new", [GS]: "sha-gs", [X11]: "sha-x11" };
  */
 type Mirror = "up" | "down" | "down-then-up" | "partial";
 
-function cacheStubDir(mirror: Mirror, cached: Record<string, string>) {
+interface CacheStubOpts {
+  rmFails?: boolean;
+  chownFails?: boolean;
+  unreadableDebs?: string[];
+}
+
+function cacheStubDir(mirror: Mirror, cached: Record<string, string>, opts: CacheStubOpts = {}) {
   const dir = mkdtempSync(join(tmpdir(), "apt-cache-"));
   const bin = join(dir, "bin");
   const archives = join(dir, "archives");
@@ -314,7 +320,10 @@ function cacheStubDir(mirror: Mirror, cached: Record<string, string>) {
     sleep: "exec /bin/sleep 0.05",
     fuser: "exit 1",
     dpkg: `echo "dpkg $*" >> "${calls}"`,
-    sha256sum: 'for f in "$@"; do printf "%s  %s\\n" "$(cat "$f")" "$f"; done',
+    sha256sum: `for f in "$@"; do
+  ${(opts.unreadableDebs ?? []).map((name) => `case "$f" in *"${name}") echo "sha256sum: $f: Permission denied" >&2; exit 1 ;; esac`).join("\n  ")}
+  printf "%s  %s\\n" "$(cat "$f")" "$f"
+done`,
     "dpkg-query": `cat "${status}"`,
     "apt-cache": `shift
 rc=0
@@ -370,6 +379,12 @@ for p in $pkgs; do
   echo "\${p}_\${v}_amd64" >> "${status}"
 done`,
   };
+  if (opts.rmFails) {
+    stubs.rm = 'echo "rm: failed" >&2; exit 1';
+  }
+  if (opts.chownFails) {
+    stubs.chown = 'echo "chown: failed" >&2; exit 1';
+  }
   mkdirSync(bin);
   for (const [name, body] of Object.entries(stubs)) {
     const path = join(bin, name);
@@ -379,8 +394,13 @@ done`,
   return { dir, archives, calls, ...aptDirs(dir) };
 }
 
-function runCached(mirror: Mirror, cached: Record<string, string> = {}, layout?: AptLayout) {
-  const stub = cacheStubDir(mirror, cached);
+function runCached(
+  mirror: Mirror,
+  cached: Record<string, string> = {},
+  layout?: AptLayout,
+  opts: CacheStubOpts = {},
+) {
+  const stub = cacheStubDir(mirror, cached, opts);
   layout?.(stub.etc, stub.lists);
   const output = join(stub.dir, "github_output");
   writeFileSync(output, "");
@@ -535,6 +555,30 @@ describe.skipIf(process.platform === "win32")("apt-install .deb archive cache (#
     expect(run.status, run.output).toBe(0);
     expect(run.output).toContain("1 not in it");
     expect(run.archives).toEqual([GS, X11, QPDF]);
+  });
+
+  it("warns and saves the cache when clearing partial/ and lock fails (#2008)", () => {
+    const run = runCached("up", {}, undefined, { rmFails: true });
+    expect(run.status, run.output).toBe(0);
+    expect(run.output).toContain("could not clear apt's partial and lock files");
+    expect(run.githubOutput).toBe("fresh=3\n");
+  });
+
+  it("warns and saves the cache when chown fails (#2008)", () => {
+    const run = runCached("up", {}, undefined, { chownFails: true });
+    expect(run.status, run.output).toBe(0);
+    expect(run.output).toContain("could not change ownership of apt archive dir");
+    expect(run.githubOutput).toBe("fresh=3\n");
+  });
+
+  it("warns and drops an unreadable cached .deb without killing the script (#2008)", () => {
+    const run = runCached("up", WARM, undefined, { unreadableDebs: [QPDF] });
+    expect(run.status, run.output).toBe(0);
+    expect(run.output).toContain("could not read");
+    expect(run.output).toContain("1 dropped");
+    expect(run.calls).toContain("downloaded qpdf");
+    expect(run.archive(QPDF)).toBe("sha-qpdf-new");
+    expect(run.githubOutput).toBe("fresh=1\n");
   });
 });
 
