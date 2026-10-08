@@ -354,7 +354,17 @@ function ImageObject({
   draggable: boolean;
 }) {
   const a = obj.attrs as ImageAttrs;
-  const [image] = useImage(a.src);
+  const [loaded] = useImage(a.src);
+  // A pixel brush mid-stroke hands over its canvas, which it keeps painting into.
+  // Only a real canvas counts: a serialised one comes back as `{}`, which Konva
+  // would throw on at every draw.
+  const liveImage = a.image instanceof HTMLCanvasElement ? a.image : undefined;
+  // Mouse up swaps the canvas for a data URL that takes a few frames to decode.
+  // Keep showing the canvas (same pixels) until it has, or the stroke blinks out.
+  const lastLiveRef = useRef<HTMLCanvasElement | undefined>(undefined);
+  if (liveImage) lastLiveRef.current = liveImage;
+  else if (loaded) lastLiveRef.current = undefined;
+  const image = liveImage ?? loaded ?? lastLiveRef.current;
   if (!image) return null;
 
   return (

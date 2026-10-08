@@ -117,6 +117,12 @@ export interface ImageAttrs {
   scaleY?: number;
   opacity: number;
   src: string;
+  /**
+   * Runtime only. A live canvas a brush tool is painting into during a stroke;
+   * the renderer shows it in place of `src`. The brush clears it on mouse up and
+   * stores the result as `src`, so it must never outlive a stroke or be saved.
+   */
+  image?: CanvasImageSource;
 }
 
 export interface ArrowAttrs {

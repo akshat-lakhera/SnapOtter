@@ -24,6 +24,10 @@ type StageView = {
       scaleX(): number;
       find(selector: string): Array<{
         id(): string;
+        getLayer(): {
+          getNativeCanvasElement(): HTMLCanvasElement;
+          getCanvas(): { getPixelRatio(): number };
+        } | null;
         image(): CanvasImageSource | undefined;
         width(): number;
         height(): number;
@@ -73,6 +77,26 @@ function readStrokeObjectPixel(page: Page, x: number, y: number): Promise<Rgba |
       if (!ctx) return null;
       ctx.drawImage(source, 0, 0);
       const d = ctx.getImageData(x, y, 1, 1).data;
+      return { r: d[0], g: d[1], b: d[2], a: d[3] };
+    },
+    { x, y },
+  );
+}
+
+// One document pixel as the editor's main layer has actually painted it, which is
+// what the user sees. Reads the layer's canvas without asking Konva to redraw.
+function readLayerPixel(page: Page, x: number, y: number): Promise<Rgba | null> {
+  return page.evaluate(
+    ({ x, y }) => {
+      const stage = (window as unknown as StageView).Konva?.stages[0];
+      const layer = stage?.find("Image")[0]?.getLayer();
+      if (!stage || !layer) return null;
+      const ratio = layer.getCanvas().getPixelRatio();
+      const ctx = layer.getNativeCanvasElement().getContext("2d");
+      if (!ctx) return null;
+      const px = Math.round((stage.x() + (x + 0.5) * stage.scaleX()) * ratio);
+      const py = Math.round((stage.y() + (y + 0.5) * stage.scaleY()) * ratio);
+      const d = ctx.getImageData(px, py, 1, 1).data;
       return { r: d[0], g: d[1], b: d[2], a: d[3] };
     },
     { x, y },
@@ -230,6 +254,57 @@ for (const tool of ["dodge", "burn", "sponge"] as const) {
         .poll(async () => (await readStrokeObjectPixel(page, 2, 75))?.a, { timeout: 10_000 })
         .toBe(255);
       expect(pageErrors).toEqual([]);
+    });
+  });
+}
+
+// Issue #1039: the pixel brushes never showed their stroke until mouse up. The
+// hooks pushed the live canvas into the object as `image`, but the renderer only
+// ever read `src`, so the node kept showing the mouse-down bitmap (the first dab
+// alone). Sampling the node's bitmap while the button is still held tells the two
+// apart: far along the stroke it is transparent before the fix, opaque after.
+for (const tool of ["blur-brush", "sharpen-brush", "smudge", "dodge", "burn", "sponge"] as const) {
+  test.describe(`Editor ${tool} live preview (issue #1039)`, () => {
+    test.beforeEach(async ({ editorPage: page }) => {
+      await loadTestImage(page);
+      await waitForSourceImage(page);
+      await selectTool(page, tool);
+    });
+
+    test(`a ${tool} stroke is visible on the canvas while the mouse is still down`, async ({
+      editorPage: page,
+    }) => {
+      const start = await screenPointForDocumentPixel(page, 60, 75);
+      const end = await screenPointForDocumentPixel(page, 140, 75);
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await expect.poll(() => countImageObjects(page), { timeout: 10_000 }).toBe(1);
+
+      await page.mouse.move(end.x, end.y, { steps: 8 });
+
+      // Button still held: no mouse-up has swapped in a fresh data URL yet.
+      await expect
+        .poll(async () => (await readStrokeObjectPixel(page, 140, 75))?.a, { timeout: 10_000 })
+        .toBe(255);
+      // Dodge and burn change the colour, so the painted layer shows whether the
+      // stroke reached the screen. The fixture is flat rgb(255,100,50).
+      if (tool === "dodge" || tool === "burn") {
+        await expect
+          .poll(async () => (await readLayerPixel(page, 140, 75))?.g, { timeout: 10_000 })
+          .not.toBe(ORANGE.g);
+      }
+
+      await page.mouse.up();
+
+      // The stroke must not blink out while the finished data URL decodes: read
+      // once, straight after release, with no polling.
+      expect(await readStrokeObjectPixel(page, 140, 75)).not.toBeNull();
+
+      // The finished stroke keeps its pixels and stays confined to the brush path.
+      await expect
+        .poll(async () => (await readStrokeObjectPixel(page, 140, 75))?.a, { timeout: 10_000 })
+        .toBe(255);
+      expect((await readStrokeObjectPixel(page, 2, 2))?.a).toBe(0);
     });
   });
 }
