@@ -92,11 +92,14 @@ function canvasIsDead(ctx: CanvasRenderingContext2D): boolean {
 }
 
 // What a browser throws when a canvas is too big to read back: RangeError from the
-// pixel buffer in Chromium and WebKit, IndexSizeError for an empty source, and
+// pixel buffer in Chromium and WebKit, IndexSizeError for an empty source,
+// InvalidStateError from Firefox past its limit ("Canvas exceeds max size"), and
 // NS_ERROR_FAILURE in Firefox. Anything else is a bug and is left to propagate.
 function isCanvasSizeError(err: unknown): boolean {
   if (err instanceof RangeError) return true;
-  if (err instanceof DOMException) return err.name === "IndexSizeError";
+  if (err instanceof DOMException) {
+    return err.name === "IndexSizeError" || err.name === "InvalidStateError";
+  }
   return err instanceof Error && err.message.includes("NS_ERROR_FAILURE");
 }
 
@@ -124,6 +127,17 @@ export function readDocumentPixels(
 }
 
 /**
+ * Why a failed read or encode of a captured canvas happened, or null when it is
+ * not a failure the user can act on (a bug, left to propagate). A tainted canvas
+ * throws SecurityError on read; one the browser cannot back throws a size error.
+ */
+export function classifyCaptureError(err: unknown): CaptureFailure | null {
+  if (err instanceof DOMException && err.name === "SecurityError") return "tainted";
+  if (isCanvasSizeError(err)) return "no-context";
+  return null;
+}
+
+/**
  * Capture the document and hand back a 2D context whose pixels the caller may
  * read, or say why not. The pixel tools used to bail out of the mouse handler on a
  * null context and let a tainted canvas's SecurityError escape it, so a click did
@@ -145,10 +159,8 @@ export function captureDocumentContext(
     if (!ctx || canvasIsDead(ctx)) return { ok: false, reason: "no-context" };
     return { ok: true, ctx };
   } catch (err) {
-    if (err instanceof DOMException && err.name === "SecurityError") {
-      return { ok: false, reason: "tainted" };
-    }
-    if (isCanvasSizeError(err)) return { ok: false, reason: "no-context" };
+    const reason = classifyCaptureError(err);
+    if (reason) return { ok: false, reason };
     throw err;
   }
 }
