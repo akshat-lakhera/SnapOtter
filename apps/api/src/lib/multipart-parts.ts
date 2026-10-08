@@ -150,6 +150,8 @@ export async function* multipartParts(
   }
   // The file part being read, if any: see the request "error" listener below.
   let openFile: Readable | null = null;
+  // A file part the consumer moved past without finishing: see the loop below.
+  let abandonedFile: Readable | null = null;
 
   const queue: Array<MultipartPart | Error | typeof DONE> = [];
   let wake: (() => void) | null = null;
@@ -177,7 +179,13 @@ export async function* multipartParts(
     // registered listener, not just the first.
     stream.on("error", () => {});
     // "limit" only fires when a fileSize limit is set, so fileSizeLimit is defined.
-    stream.on("limit", () => stream.destroy(fileTooLargeError(fileSizeLimit ?? 0)));
+    stream.on("limit", () => {
+      const error = fileTooLargeError(fileSizeLimit ?? 0);
+      stream.destroy(error);
+      // Nobody is reading this part any more, so nobody will see its error and
+      // the destroyed stream will never end: fail the request with it.
+      if (abandonedFile === stream) push(error);
+    });
     openFile = stream;
     const settled = () => {
       if (openFile === stream) openFile = null;
@@ -223,8 +231,24 @@ export async function* multipartParts(
 
   raw.pipe(bb);
 
+  // The file part last handed to the consumer. Busboy emits "finish" only
+  // after every file stream has ended, so a part the consumer moved past
+  // without reading (a route that takes one named file and ignores the rest)
+  // would hold the iterator, and the request, open forever (#2156). Asking for
+  // the next part is the consumer saying it is done with this one, so drain
+  // what is left of it (sign-pdf already does this by hand). A part the size
+  // limit already destroyed never emits "end", so busboy would wait for it
+  // forever: report its error (the 413) to the consumer instead of hanging.
+  let previousFile: Readable | null = null;
+
   try {
     while (true) {
+      if (previousFile && !previousFile.readableEnded) {
+        if (previousFile.errored) throw previousFile.errored;
+        abandonedFile = previousFile;
+        previousFile.resume();
+      }
+      previousFile = null;
       if (queue.length === 0) {
         await new Promise<void>((resolve) => {
           wake = resolve;
@@ -234,6 +258,7 @@ export async function* multipartParts(
       if (value === undefined) continue;
       if (value === DONE) return;
       if (value instanceof Error) throw value;
+      if (value.type === "file") previousFile = value.file;
       yield value;
     }
   } finally {
