@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(),
   enqueueToolJob: vi.fn(),
   extractText: vi.fn(),
+  extractPdfText: vi.fn(),
   getAuthUser: vi.fn(),
   getOcrRuntimeCapability: vi.fn(),
   prepare: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
   return {
     ...actual,
     extractText: mocks.extractText,
+    extractPdfText: mocks.extractPdfText,
     getOcrRuntimeCapability: mocks.getOcrRuntimeCapability,
   };
 });
@@ -46,10 +48,11 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
 }));
 
 import { env } from "../../../apps/api/src/config.js";
-import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
+import { runAiPathToolJob, runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerOcr } from "../../../apps/api/src/routes/tools/ocr.js";
+import "../../../apps/api/src/routes/tools/ocr-pdf.js";
 
 const INPUT = Buffer.from("uploaded");
 const NORMALIZED = Buffer.from("normalized");
@@ -329,5 +332,70 @@ describe("OCR AI job handler resource controls", () => {
 
     expect(mocks.prepare).not.toHaveBeenCalled();
     expect(mocks.extractText).not.toHaveBeenCalled();
+  });
+});
+
+// The accurate OCR runtime can disappear between the upload (which checked it)
+// and the worker (which checks again). That is the operator's install, not the
+// caller's file: a 503 with a code, so the route and a batch answer it as such
+// instead of a 422 that blames the upload (#2181).
+describe("OCR worker: the runtime vanished after the upload", () => {
+  const ctx = () => ({
+    scratchDir: "/tmp/ocr-job",
+    signal: new AbortController().signal,
+    report: vi.fn(),
+  });
+
+  beforeEach(() => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: false,
+      qualities: [],
+      providers: [],
+    });
+  });
+
+  it("answers an image OCR for an accurate tier as ENGINE_UNAVAILABLE (503)", async () => {
+    const data = job();
+    data.settings = { quality: "best", language: "en" };
+
+    await expect(runAiToolJob(data, INPUT, ctx())).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      message: "OCR best runtime is no longer available",
+      details: "Repair or reinstall OCR in Settings > AI Features, then run it again.",
+    });
+    expect(mocks.extractText).not.toHaveBeenCalled();
+  });
+
+  it("answers a PDF OCR for an accurate tier as ENGINE_UNAVAILABLE (503)", async () => {
+    const data = { ...job(), toolId: "ocr-pdf", settings: { quality: "balanced", language: "en" } };
+
+    await expect(
+      runAiPathToolJob(data, { path: "/tmp/in.pdf", size: 10 }, ctx()),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      message: "OCR balanced runtime is no longer available",
+    });
+    expect(mocks.extractPdfText).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Fast tier running, it needs no accurate runtime", async () => {
+    mocks.extractText.mockResolvedValueOnce({
+      text: "ok",
+      engine: "tesseract",
+      requestedQuality: "fast",
+      actualQuality: "fast",
+      device: "cpu",
+      provider: "tesseract",
+      degraded: false,
+      warnings: [],
+    });
+
+    await expect(runAiToolJob(job(), INPUT, ctx())).resolves.toMatchObject({
+      filename: "scan_ocr.txt",
+    });
   });
 });

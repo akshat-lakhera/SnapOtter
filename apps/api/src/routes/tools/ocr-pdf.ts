@@ -16,7 +16,7 @@ import {
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { copyObjectToFile, deleteObject } from "../../lib/object-storage.js";
-import { resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
+import { ocrRuntimeUnavailable, resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
 import {
   ocrUploadErrorMessage,
   ocrUploadErrorStatus,
@@ -58,7 +58,7 @@ registerAiPathJobHandler("ocr-pdf", async (input, data, ctx) => {
   if (quality !== "fast") {
     const capability = getOcrRuntimeCapability();
     if (!capability.available || !capability.qualities.includes(quality)) {
-      throw new Error(`OCR ${quality} runtime is no longer available`);
+      throw ocrRuntimeUnavailable(quality);
     }
   }
 

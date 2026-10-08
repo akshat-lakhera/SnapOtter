@@ -4,6 +4,7 @@ import {
   type OcrRuntimeCapability,
   type OcrRuntimeQuality,
 } from "@snapotter/ai";
+import { InputValidationError } from "../modality/contract.js";
 
 export type OcrIngressQuality = "fast" | OcrRuntimeQuality;
 
@@ -131,4 +132,19 @@ export function resolveOcrIngressSettings(
     reason: capability.reason,
     requestedQuality: quality,
   };
+}
+
+/**
+ * The accurate OCR runtime was there when the file was uploaded and is gone by
+ * the time the worker looks. That is the operator's install, not the caller's
+ * file, so it is a 503 with a code: the route and a batch of these answer it as
+ * a server-side failure instead of a 422 that blames the upload (#2181).
+ */
+export function ocrRuntimeUnavailable(quality: OcrRuntimeQuality): InputValidationError {
+  return new InputValidationError(
+    `OCR ${quality} runtime is no longer available`,
+    503,
+    "Repair or reinstall OCR in Settings > AI Features, then run it again.",
+    "ENGINE_UNAVAILABLE",
+  );
 }
