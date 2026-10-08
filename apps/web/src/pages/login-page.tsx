@@ -46,13 +46,21 @@ function retryAfterMinutes(bodyRetryAfter: unknown, header: string | null): numb
  * another 429. "Too many login attempts" (the message #826 gave handleSubmit)
  * is also wrong here: this user is past the password and one code away, not
  * guessing credentials.
+ *
+ * MFA_EXPIRED (#1234) is a 401 like a wrong code, but the challenge token is
+ * gone (5 minute TTL, or burned by 5 wrong codes) so no later code can work.
+ * `restart` tells the caller to drop back to the password form.
  */
 function mfaFailureMessage(
   status: number,
+  code: unknown,
   bodyRetryAfter: unknown,
   header: string | null,
   t: TranslationKeys,
-): { message: string; clearCode: boolean } {
+): { message: string; clearCode: boolean; restart: boolean } {
+  if (code === "MFA_EXPIRED") {
+    return { message: t.auth.mfaExpired, clearCode: true, restart: true };
+  }
   if (status === 429) {
     const minutes = retryAfterMinutes(bodyRetryAfter, header);
     return {
@@ -61,12 +69,13 @@ function mfaFailureMessage(
           ? t.auth.mfaThrottledUnknownWait
           : format(plural(minutes, t.auth.mfaThrottled, t.auth.mfaThrottledPlural), { minutes }),
       clearCode: false,
+      restart: false,
     };
   }
   if (status >= 500) {
-    return { message: t.auth.connectionError, clearCode: false };
+    return { message: t.auth.connectionError, clearCode: false, restart: false };
   }
-  return { message: t.auth.mfaInvalidCode, clearCode: true };
+  return { message: t.auth.mfaInvalidCode, clearCode: true, restart: false };
 }
 
 function QrCode({ uri }: { uri: string }) {
@@ -355,6 +364,22 @@ export function LoginPage() {
     }
   };
 
+  // A dead challenge token can't be retried, so leave both MFA panels and show
+  // the password form with the reason (#1234).
+  const restartLogin = (message: string) => {
+    setShowMfaPrompt(false);
+    setMfaToken("");
+    setMfaCode("");
+    setShowMfaEnrollment(false);
+    setEnrollmentToken("");
+    setEnrollmentUri("");
+    setEnrollmentRecoveryCodes([]);
+    setEnrollmentCode("");
+    setError(message);
+    // The focused code input is about to unmount; don't let focus fall to <body>.
+    later(() => document.getElementById("username")?.focus(), 100);
+  };
+
   const handleMfaComplete = async () => {
     setMfaLoading(true);
     setError("");
@@ -366,12 +391,17 @@ export function LoginPage() {
       });
       if (!res.ok) {
         const failure = await res.json().catch(() => null);
-        const { message, clearCode } = mfaFailureMessage(
+        const { message, clearCode, restart } = mfaFailureMessage(
           res.status,
+          failure?.code,
           failure?.retryAfter,
           res.headers.get("Retry-After"),
           t,
         );
+        if (restart) {
+          restartLogin(message);
+          return;
+        }
         setError(message);
         if (clearCode) setMfaCode("");
         return;
@@ -402,12 +432,19 @@ export function LoginPage() {
       });
       if (!res.ok) {
         const failure = await res.json().catch(() => null);
-        const { message, clearCode } = mfaFailureMessage(
+        const { message, clearCode, restart } = mfaFailureMessage(
           res.status,
+          failure?.code,
           failure?.retryAfter,
           res.headers.get("Retry-After"),
           t,
         );
+        if (restart) {
+          // A fresh login mints a new secret and new recovery codes, so the QR
+          // the user may already have scanned and the codes they saved are dead.
+          restartLogin(t.auth.mfaEnrollmentExpired);
+          return;
+        }
         setError(message);
         if (clearCode) setEnrollmentCode("");
         return;
@@ -559,7 +596,8 @@ export function LoginPage() {
                   value={enrollmentCode}
                   onChange={(e) => setEnrollmentCode(e.target.value.replace(/[^0-9]/g, ""))}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && enrollmentCode.length >= 6) handleEnrollComplete();
+                    if (e.key === "Enter" && !enrollmentLoading && enrollmentCode.length >= 6)
+                      handleEnrollComplete();
                   }}
                   className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
                 />
@@ -611,7 +649,7 @@ export function LoginPage() {
                 value={mfaCode}
                 onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, ""))}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && mfaCode.length >= 6) handleMfaComplete();
+                  if (e.key === "Enter" && !mfaLoading && mfaCode.length >= 6) handleMfaComplete();
                 }}
                 className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
               />

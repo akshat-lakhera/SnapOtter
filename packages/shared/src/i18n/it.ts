@@ -5312,6 +5312,9 @@ export const it: TranslationKeys = {
     verify: "Verifica",
     verifying: "Verifica in corso...",
     mfaInvalidCode: "Codice non valido. Riprova.",
+    mfaExpired: "La sessione di verifica è scaduta. Accedi di nuovo.",
+    mfaEnrollmentExpired:
+      "La sessione di configurazione è scaduta. Accedi di nuovo per ottenere un nuovo codice QR e nuovi codici di ripristino; quelli mostrati prima non funzioneranno.",
     mfaEnrollmentHeading: "Configura l'autenticazione a due fattori per continuare",
     mfaEnrollmentRequired:
       "La tua organizzazione richiede l'autenticazione a più fattori. Configura l'MFA nelle impostazioni del tuo account.",
