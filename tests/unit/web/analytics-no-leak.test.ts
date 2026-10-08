@@ -173,6 +173,30 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
       expect(result).not.toBeNull();
       expect(result.exception.values[0].value).toBe("TypeError");
     });
+
+    // #1115: with no PostHog, "analytics active" is false while Sentry is live,
+    // so a check on it mistook a live Sentry for no telemetry at all.
+    it("reports telemetry on while PostHog analytics is off", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      expect(mod.isAnalyticsActive()).toBe(false);
+      expect(mod.isTelemetryEnabled()).toBe(true);
+    });
+
+    it("an instance-wide opt-out seen after init stops Sentry", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      const beforeSend = mockSentryInit.mock.calls[0]?.[0]?.beforeSend;
+
+      await mod.applyInstanceAnalytics({ ...sentryOnlyConfig, enabled: false });
+
+      expect(mod.isTelemetryEnabled()).toBe(false);
+      expect(beforeSend({ exception: { values: [{ type: "TypeError", value: "x" }] } })).toBeNull();
+    });
+
+    it("an analytics setting that failed to load stops telemetry too", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      await mod.applyInstanceAnalytics(null);
+      expect(mod.isTelemetryEnabled()).toBe(false);
+    });
   });
 
   describe("PII never leaks even when analytics enabled", () => {
