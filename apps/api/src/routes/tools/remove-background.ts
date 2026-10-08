@@ -59,13 +59,59 @@ const settingsSchema = z.object({
   decontaminate: z.boolean().optional(),
 });
 
+type RemoveBgSettings = z.infer<typeof settingsSchema>;
+
+// Pipelines and batches carry settings as JSON, so an uploaded background image
+// can't reach the worker. Reject the type up front instead of returning a
+// cutout with the background silently dropped (#1047).
+const pipelineSettingsSchema = settingsSchema.extend({
+  backgroundType: z.enum(["transparent", "color", "gradient", "blur"]).optional(),
+});
+
+/**
+ * Composite the cutout over the requested background and name the result.
+ * Shared by the pipeline/batch path of the AI handler and the registry process
+ * fn so the two cannot drift apart again (#1047).
+ */
+async function compositeCutout(
+  transparent: Buffer,
+  original: Buffer,
+  s: RemoveBgSettings,
+  filename: string,
+) {
+  const fmt = (s.outputFormat ?? "png") as BgOutputFormat;
+  const buffer = await applyEffects(transparent, original, {
+    backgroundType: s.backgroundType,
+    backgroundColor: s.backgroundColor,
+    gradientColor1: s.gradientColor1,
+    gradientColor2: s.gradientColor2,
+    gradientAngle: s.gradientAngle,
+    blurEnabled: s.blurEnabled,
+    blurIntensity: s.blurIntensity,
+    shadowEnabled: s.shadowEnabled,
+    shadowOpacity: s.shadowOpacity,
+    outputFormat: fmt,
+  });
+  return {
+    buffer,
+    filename: `${filename.replace(/\.[^.]+$/, "")}_nobg.${fmt}`,
+    contentType: BG_FORMAT_CONTENT_TYPES[fmt],
+  };
+}
+
 // ── AI job handler (runs inside the BullMQ worker) ────────────────
+// The worker dispatches to this handler before the registry process fn, so it
+// has to cover every job kind. Standalone jobs ("ai-tool") are Phase 1 of the
+// two-phase flow and return the transparent mask; pipeline steps and batch
+// children have no Phase 2, so they get the finished composite (#1047).
 registerAiJobHandler("remove-background", async (input, data, ctx) => {
   const settings = settingsSchema.parse(data.settings);
+  const standalone = data.kind === "ai-tool";
+  const source = standalone ? input : await autoOrient(input);
 
   // Phase 1: AI background removal -> transparent PNG
   const transparentResult = await removeBackground(
-    input,
+    source,
     ctx.scratchDir,
     {
       model: settings.model,
@@ -75,6 +121,8 @@ registerAiJobHandler("remove-background", async (input, data, ctx) => {
     },
     (percent, stage) => ctx.report(percent, stage),
   );
+
+  if (!standalone) return compositeCutout(transparentResult, source, settings, data.filename);
 
   // The mask IS the transparent result; cache original for effects re-apply
   const maskFilename = `${data.filename.replace(/\.[^.]+$/, "")}_mask.png`;
@@ -413,7 +461,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
   // ── Pipeline/batch registry ──────────────────────────────────────
   registerToolProcessFn({
     toolId: "remove-background",
-    settingsSchema,
+    settingsSchema: pipelineSettingsSchema,
     process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
@@ -428,26 +476,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
           signal: ctx?.signal,
         });
 
-        const fmt = (s.outputFormat ?? "png") as BgOutputFormat;
-        const resultBuffer = await applyEffects(transparentResult, orientedBuffer, {
-          backgroundType: s.backgroundType,
-          backgroundColor: s.backgroundColor,
-          gradientColor1: s.gradientColor1,
-          gradientColor2: s.gradientColor2,
-          gradientAngle: s.gradientAngle,
-          blurEnabled: s.blurEnabled,
-          blurIntensity: s.blurIntensity,
-          shadowEnabled: s.shadowEnabled,
-          shadowOpacity: s.shadowOpacity,
-          outputFormat: fmt,
-        });
-
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.${fmt}`;
-        return {
-          buffer: resultBuffer,
-          filename: outputFilename,
-          contentType: BG_FORMAT_CONTENT_TYPES[fmt],
-        };
+        return await compositeCutout(transparentResult, orientedBuffer, s, filename);
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }
