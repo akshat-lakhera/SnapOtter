@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { en } from "@snapotter/shared/i18n/en.js";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const deployment = vi.hoisted(() => ({
@@ -9,6 +10,10 @@ const deployment = vi.hoisted(() => ({
   downloadUrl: null as string | null,
   // Phase 1 not run yet: no result, so the submit button is what renders.
   beforeRun: false,
+  // What the processor reports while and after a run, for the tests that watch
+  // the panel react to a re-run.
+  processing: false,
+  error: null as string | null,
   processFiles: vi.fn(),
 }));
 
@@ -20,8 +25,8 @@ vi.mock("@/hooks/use-tool-processor", () => ({
   useToolProcessor: () => ({
     processFiles: deployment.processFiles,
     processAllFiles: vi.fn(),
-    processing: false,
-    error: null,
+    processing: deployment.processing,
+    error: deployment.error,
     downloadUrl: deployment.beforeRun
       ? null
       : (deployment.downloadUrl ?? `${deployment.basePath}/api/v1/download/JOB123/pic_mask.png`),
@@ -51,6 +56,8 @@ afterEach(() => {
   deployment.basePath = "";
   deployment.downloadUrl = null;
   deployment.beforeRun = false;
+  deployment.processing = false;
+  deployment.error = null;
   deployment.processFiles.mockReset();
   useFileStore.getState().setFiles([]);
 });
@@ -140,5 +147,107 @@ describe("remove-background output format routing (#720)", () => {
 
     expect(await screen.findByTestId("remove-background-submit")).toBeInTheDocument();
     expect(screen.queryByTestId("remove-background-download")).not.toBeInTheDocument();
+  });
+});
+
+// The effects request reads the mask and original an earlier removal stored.
+// When the server no longer holds them it answers 410 BACKGROUND_REMOVAL_EXPIRED
+// and the panel removes the background again instead of leaving a download
+// button that can never work (#2119).
+describe("remove-background effects after the stored cutout expired (#2119)", () => {
+  async function applyEffects(answer: { status: number; body: unknown }) {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: answer.status,
+      json: async () => answer.body,
+    });
+    vi.stubGlobal("fetch", fetch);
+    const view = render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    return view;
+  }
+
+  const expired = {
+    status: 410,
+    body: { error: "expired", code: "BACKGROUND_REMOVAL_EXPIRED" },
+  };
+  const note = () => en.toolSettings["remove-background"].effectsExpired;
+
+  it("removes the background again and says why", async () => {
+    await applyEffects({
+      status: 410,
+      body: { error: "expired", code: "BACKGROUND_REMOVAL_EXPIRED" },
+    });
+
+    expect(
+      await screen.findByText(en.toolSettings["remove-background"].effectsExpired),
+    ).toBeVisible();
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    const [files, , options] = deployment.processFiles.mock.calls[0];
+    expect(files).toHaveLength(1);
+    expect(options).toEqual({ skipLibrarySave: true });
+  });
+
+  it("shows any other failure as before, without running the removal again", async () => {
+    await applyEffects({ status: 500, body: { error: "disk on fire" } });
+
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(screen.queryByText(en.toolSettings["remove-background"].effectsExpired)).toBeNull();
+    expect(deployment.processFiles).not.toHaveBeenCalled();
+  });
+
+  it("drops the note when the new removal fails, leaving the real error", async () => {
+    const view = await applyEffects(expired);
+    expect(await screen.findByText(note())).toBeVisible();
+
+    // A run that starts clears the entry's result, and a failed one leaves it
+    // cleared, so the panel never sees a fresh download URL.
+    deployment.beforeRun = true;
+    deployment.processing = true;
+    view.rerender(<RemoveBgSettings />);
+    deployment.processing = false;
+    deployment.error = "Canceled";
+    view.rerender(<RemoveBgSettings />);
+
+    await waitFor(() => expect(screen.queryByText(note())).toBeNull());
+    expect(screen.getByText("Canceled")).toBeVisible();
+  });
+
+  it("drops the note once the new removal's result arrives", async () => {
+    const view = await applyEffects(expired);
+    expect(await screen.findByText(note())).toBeVisible();
+
+    deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+    view.rerender(<RemoveBgSettings />);
+
+    await waitFor(() => expect(screen.queryByText(note())).toBeNull());
+  });
+
+  it("does not run the removal again for a file the user has since replaced", async () => {
+    let answer!: (response: unknown) => void;
+    const fetch = vi.fn().mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    vi.stubGlobal("fetch", fetch);
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    // A different file lands in the store while the request is in flight.
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([new File([new Uint8Array([4, 5, 6])], "other.png", { type: "image/png" })]);
+    });
+    await act(async () => {
+      answer({ ok: false, status: 410, json: async () => expired.body });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(deployment.processFiles).not.toHaveBeenCalled();
+    expect(screen.queryByText(note())).toBeNull();
   });
 });

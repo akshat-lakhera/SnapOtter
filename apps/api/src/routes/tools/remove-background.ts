@@ -37,7 +37,12 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  isMissingObjectError,
+  isValidObjectKey,
+  putObject,
+} from "../../lib/object-storage.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
@@ -368,33 +373,71 @@ export function registerRemoveBackground(app: FastifyInstance) {
         outputFormat: z.enum(["png", "webp", "avif"]).optional(),
       });
 
+      let settings: z.infer<typeof effectsSchema>;
       try {
-        let settings: z.infer<typeof effectsSchema>;
-        try {
-          const parsed = JSON.parse(settingsRaw);
-          const result = effectsSchema.safeParse(parsed);
-          if (!result.success) {
-            return reply.status(400).send({
-              error: "Invalid settings",
-              details: formatZodErrors(result.error.issues),
-            });
-          }
-          settings = result.data;
-        } catch {
-          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        const parsed = JSON.parse(settingsRaw);
+        const result = effectsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply.status(400).send({
+            error: "Invalid settings",
+            details: formatZodErrors(result.error.issues),
+          });
         }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
 
-        const { jobId, filename } = settings;
+      const { jobId, filename } = settings;
 
-        const baseName = filename.replace(/\.[^.]+$/, "");
-        const maskKey = `outputs/${jobId}/${baseName}_mask.png`;
-        const originalKey = `outputs/${jobId}/${baseName}_original.png`;
+      const baseName = filename.replace(/\.[^.]+$/, "");
+      const maskKey = `outputs/${jobId}/${baseName}_mask.png`;
+      const originalKey = `outputs/${jobId}/${baseName}_original.png`;
+      // A key the store would refuse is the client's mistake, not a fault.
+      if (!isValidObjectKey(maskKey) || !isValidObjectKey(originalKey)) {
+        return reply.status(400).send({ error: "Invalid jobId or filename" });
+      }
 
-        const [maskBuffer, originalBuffer] = await Promise.all([
-          getObjectBuffer(maskKey),
-          getObjectBuffer(originalKey),
-        ]);
+      // Read what the earlier removal stored outside the processing catch below,
+      // which answers 422 for anything (#2119). A missing object means the
+      // removal expired and the client must run it again; any other read failure
+      // is a storage fault and belongs to the error handler and Sentry. Both
+      // reads settle first, so a missing object can't hide a fault on the other.
+      const [maskRead, originalRead] = await Promise.allSettled([
+        getObjectBuffer(maskKey),
+        getObjectBuffer(originalKey),
+      ]);
+      if (maskRead.status === "rejected" || originalRead.status === "rejected") {
+        const reads = [
+          { key: maskKey, read: maskRead },
+          { key: originalKey, read: originalRead },
+        ].flatMap(({ key, read }) =>
+          read.status === "rejected" ? [{ key, err: read.reason }] : [],
+        );
+        const faults = reads.filter(({ err }) => !isMissingObjectError(err));
+        if (faults.length > 0) {
+          // Only the first reaches the error handler; keep the rest in the logs.
+          for (const { key, err } of faults.slice(1)) {
+            request.log.error({ err, key }, "Stored cutout read failed");
+          }
+          throw faults[0].err;
+        }
+        // Expected once in a while; a stream of these means the volume or
+        // bucket lost outputs it should still hold. Both missing is a swept
+        // job; only one missing is an anomaly worth noticing.
+        request.log.warn(
+          { jobId, toolId: "remove-background", missing: reads.map(({ key }) => key) },
+          "Cutout missing at effects",
+        );
+        return reply.status(410).send({
+          error: "This image's background removal has expired. Remove the background again.",
+          code: "BACKGROUND_REMOVAL_EXPIRED",
+        });
+      }
+      const maskBuffer = maskRead.value;
+      const originalBuffer = originalRead.value;
 
+      try {
         // Decode HEIC/HEIF background image if needed
         if (bgImageBuffer) {
           const bgValidation = await validateImageBuffer(bgImageBuffer, bgFilename);

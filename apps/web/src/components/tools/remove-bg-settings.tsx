@@ -895,6 +895,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     const filename = decodeURIComponent(match[2]);
     if (jobId && filename) {
       setBgJobId(jobId);
+      // A fresh removal settles any "expired, running again" note (#2119).
+      setEffectsError(null);
       // Derive the cached filenames from the mask filename
       const baseName = filename.replace(/_mask\.png$|_nobg\.png$/, "");
       setBgFilename(baseName || filename.replace(/\.[^.]+$/, ""));
@@ -903,6 +905,12 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       setBgOriginalUrl(appUrl(`/api/v1/download/${jobId}/${encodeURIComponent(origFilename)}`));
     }
   }, [downloadUrl, processing]);
+
+  // A removal that failed or was cancelled leaves its own error on screen; the
+  // "expired, running again" note would sit beside it saying otherwise (#2119).
+  useEffect(() => {
+    if (error) setEffectsError(null);
+  }, [error]);
 
   // Phase 2: Apply effects and download
   const handleDownloadWithEffects = async () => {
@@ -953,6 +961,18 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
+        // The server no longer holds the earlier removal's mask or original
+        // (#2119). Remove the background again so effects have something to
+        // read; the note holds until that run's result arrives.
+        if (body?.code === "BACKGROUND_REMOVAL_EXPIRED") {
+          // The user may have swapped the file while this request ran; the
+          // removal below would then upload the old one into the new entry.
+          const live = useFileStore.getState().files;
+          if (live.length === 0 || live[0] !== files[0]) return;
+          setEffectsError(t.toolSettings["remove-background"].effectsExpired);
+          handleRemoveBg();
+          return;
+        }
         throw new Error(
           failedAnswerMessage(t, body, response.status, `Effects failed: ${response.status}`),
         );
