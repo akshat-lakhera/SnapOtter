@@ -9,6 +9,9 @@ import type { CanvasObject } from "@/types/editor";
 interface DragState {
   startX: number;
   startY: number;
+  /** Where the preview last ended, for a release that has no stage pointer (#2154). */
+  endX: number;
+  endY: number;
 }
 
 export interface GradientPreview {
@@ -37,7 +40,7 @@ export function useGradientTool() {
     const x = (pointer.x - panOffset.x) / zoom;
     const y = (pointer.y - panOffset.y) / zoom;
 
-    dragRef.current = { startX: x, startY: y };
+    dragRef.current = { startX: x, startY: y, endX: x, endY: y };
 
     const { gradientType } = useEditorStore.getState();
     setPreview({ startX: x, startY: y, endX: x, endY: y, gradientType });
@@ -57,11 +60,12 @@ export function useGradientTool() {
     const endX = (pointer.x - panOffset.x) / zoom;
     const endY = (pointer.y - panOffset.y) / zoom;
     const { startX, startY } = dragRef.current;
+    dragRef.current = { startX, startY, endX, endY };
 
     setPreview({ startX, startY, endX, endY, gradientType });
   }, []);
 
-  const handleMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseUp = useCallback(() => {
     if (!dragRef.current) return;
 
     setPreview(null);
@@ -73,19 +77,12 @@ export function useGradientTool() {
       gradientOpacity,
       gradientReverse,
       canvasSize,
-      zoom,
-      panOffset,
     } = useEditorStore.getState();
 
-    const stage = e.target.getStage();
-    if (!stage) return;
-
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
-
-    const endX = (pointer.x - panOffset.x) / zoom;
-    const endY = (pointer.y - panOffset.y) / zoom;
-    const { startX, startY } = dragRef.current;
+    // The end is where the preview last ended, not the stage pointer: Konva clears
+    // the pointer once it leaves the stage (a release over a panel), and a release
+    // that arrives late, from the next press, would read that press's position.
+    const { startX, startY, endX, endY } = dragRef.current;
 
     const dx = endX - startX;
     const dy = endY - startY;
