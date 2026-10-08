@@ -131,7 +131,11 @@ function SourceImage({
   canvasWidth: number;
   canvasHeight: number;
 }) {
-  const [image] = useImage(url);
+  // Without CORS mode a cross-origin image taints the canvas, and every pixel tool
+  // (and export) then throws on its first read. editor-page only opens a ?url=
+  // image after it has loaded with CORS, so asking for it here changes nothing for
+  // a URL that worked before (#1040).
+  const [image] = useImage(url, "anonymous");
   const imageRef = useRef<Konva.Image>(null);
 
   // Issue #12: Apply adjustments/filters to the source image node
