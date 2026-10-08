@@ -5,13 +5,20 @@ import {
   resolvePostHogClientHosts,
 } from "@snapotter/shared";
 import { appUrl } from "./app-url";
-import { flushEarlyErrors } from "./early-errors";
+import { discardEarlyErrors, flushEarlyErrors } from "./early-errors";
 
 type PostHogInstance = import("posthog-js").PostHog;
 
 let posthog: PostHogInstance | null = null;
 let initialized = false;
 let enabled = false; // live runtime flag; gates track() and ErrorBoundary capture
+// The latest setting this tab was given. A start in flight rechecks it after
+// every await, so an opt-out that lands mid-start wins (#2197).
+let wanted = false;
+let starting: Promise<void> | null = null;
+// optOut() closes Sentry; the config is kept so a re-enable can restart it.
+let sentryConfig: AnalyticsConfig | null = null;
+let sentryRunning = false;
 
 // Only these keys may leave the browser per event, and only as primitives.
 const ALLOWED: Record<string, ReadonlySet<string>> = {
@@ -47,9 +54,21 @@ function sanitize(event: string, properties?: Record<string, unknown>): Record<s
   return out;
 }
 
-export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
-  if (initialized || !config.enabled) return;
+export function initAnalytics(config: AnalyticsConfig): Promise<void> {
+  if (!config.enabled) return Promise.resolve();
+  wanted = true;
+  if (initialized) return Promise.resolve();
+  // One start at a time: refetches build a new config object each time, so
+  // without this two starts could both reach posthog.init and Sentry.init.
+  starting ??= startAnalytics(config).finally(() => {
+    starting = null;
+  });
+  return starting;
+}
 
+async function startAnalytics(config: AnalyticsConfig): Promise<void> {
+  // Before any await, so an opt-out mid-start can't leave optIn() without it.
+  if (config.sentryDsnWeb) sentryConfig = config;
   if (!config.posthogApiKey) {
     // Web-DSN-only bake: no PostHog key, so skip the PostHog SDK entirely
     // (mirrors the API guard) instead of feeding it an empty key. Still mark
@@ -59,6 +78,7 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   } else {
     try {
       const posthogJs = (await import("posthog-js")).default;
+      if (!wanted) return; // opted out while the SDK loaded
       // In proxy mode api_host is this instance's own /ingest (first-party, so
       // ad blockers don't drop events) and ui_host points at real PostHog;
       // otherwise both fall back to talking to PostHog directly.
@@ -142,45 +162,67 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
     // identify() call), so events stay anonymous and person-less while enabling
     // fleet rollups ("how many distinct instances use tool X") via a HogQL
     // uniq(). Omitted when empty so we never register a blank value.
-    const superProps: Record<string, string> = {
-      app_version: (await import("@snapotter/shared")).APP_VERSION,
-    };
-    if (config.instanceId) superProps.instance_id = config.instanceId;
-    posthog.register(superProps);
+    try {
+      const superProps: Record<string, string> = {
+        app_version: (await import("@snapotter/shared")).APP_VERSION,
+      };
+      if (config.instanceId) superProps.instance_id = config.instanceId;
+      // Registered even if an opt-out landed meanwhile: it only stores them
+      // locally, and a re-enable resumes this same instance, which needs them.
+      posthog.register(superProps);
+    } catch (err) {
+      // Events go without the rollup properties; Sentry must still start.
+      console.warn("[analytics] PostHog super properties failed:", err);
+    }
   }
 
+  // startSentry() itself stops short if the tab was opted out by now.
+  if (sentryConfig) await startSentry(sentryConfig);
+
+  // Replay crashes captured before Sentry was ready. Not after an opt-out:
+  // optOut() already threw the buffer away (#2197).
+  if (enabled && wanted) void flushEarlyErrors();
+}
+
+/**
+ * Start the web Sentry client, unless the tab was opted out while its code
+ * loaded. Also restarts it on a re-enable, since optOut() closes it (#2197).
+ */
+async function startSentry(config: AnalyticsConfig): Promise<void> {
   try {
-    if (config.sentryDsnWeb) {
-      const Sentry = await import("@sentry/react");
-      const { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS } = await import("@/lib/sentry-scrub");
-      // buildWebBeforeSend is typed on loose Record shapes so sentry-scrub.ts
-      // never imports @sentry/react (this module loads the SDK lazily); cast
-      // at this one boundary to the SDK callback type.
-      type SentryOptions = NonNullable<Parameters<typeof Sentry.init>[0]>;
-      Sentry.init({
-        dsn: config.sentryDsnWeb,
-        release:
-          import.meta.env.VITE_SENTRY_RELEASE || (await import("@snapotter/shared")).APP_VERSION,
-        environment: "production",
-        sendDefaultPii: false,
-        sendClientReports: false,
-        // Errors only: no tracing options, and release-health sessions are
-        // dropped by removing the session integration below.
-        integrations: (defaults) => defaults.filter((i) => i.name !== "BrowserSession"),
-        ignoreErrors: IGNORE_ERRORS,
-        denyUrls: DENY_URLS,
-        // Capture the breadcrumb trail (default 100). beforeSend (sentry-scrub.ts)
-        // sanitizes each breadcrumb before send: urls/paths redacted, data dropped.
-        beforeSend: buildWebBeforeSend(() => enabled) as unknown as SentryOptions["beforeSend"],
-      });
-    }
+    const Sentry = await import("@sentry/react");
+    const { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS } = await import("@/lib/sentry-scrub");
+    const release =
+      import.meta.env.VITE_SENTRY_RELEASE || (await import("@snapotter/shared")).APP_VERSION;
+    if (!wanted || sentryRunning) return;
+    // A closed client still lets breadcrumbs pile up on the shared scopes, so
+    // a restart after an opt-out would send the opted-out trail with its first
+    // event. Start from an empty one.
+    Sentry.getIsolationScope().clearBreadcrumbs();
+    Sentry.getCurrentScope().clearBreadcrumbs();
+    // buildWebBeforeSend is typed on loose Record shapes so sentry-scrub.ts
+    // never imports @sentry/react (this module loads the SDK lazily); cast
+    // at this one boundary to the SDK callback type.
+    type SentryOptions = NonNullable<Parameters<typeof Sentry.init>[0]>;
+    Sentry.init({
+      dsn: config.sentryDsnWeb,
+      release,
+      environment: "production",
+      sendDefaultPii: false,
+      sendClientReports: false,
+      // Errors only: no tracing options, and release-health sessions are
+      // dropped by removing the session integration below.
+      integrations: (defaults) => defaults.filter((i) => i.name !== "BrowserSession"),
+      ignoreErrors: IGNORE_ERRORS,
+      denyUrls: DENY_URLS,
+      // Capture the breadcrumb trail (default 100). beforeSend (sentry-scrub.ts)
+      // sanitizes each breadcrumb before send: urls/paths redacted, data dropped.
+      beforeSend: buildWebBeforeSend(() => enabled) as unknown as SentryOptions["beforeSend"],
+    });
+    sentryRunning = true;
   } catch (err) {
     console.warn("[analytics] Sentry init failed:", err);
   }
-
-  // Replay crashes captured before Sentry was ready (no-op if Sentry did not
-  // init, e.g. analytics disabled, so opt-out is respected).
-  if (enabled) void flushEarlyErrors();
 }
 
 /**
@@ -270,18 +312,34 @@ export function isTelemetryEnabled(): boolean {
  * instance stops too (#1115).
  */
 export async function applyInstanceAnalytics(config: AnalyticsConfig | null): Promise<void> {
-  if (config?.enabled) await initAnalytics(config);
-  else if (isTelemetryEnabled()) optOut();
+  if (config?.enabled) {
+    // A tab that started and was then opted out resumes; any other starts.
+    if (initialized && !enabled) optIn();
+    // Sentry failed to start earlier (a chunk that didn't load, say): retry.
+    else if (initialized && sentryConfig && !sentryRunning) await startSentry(sentryConfig);
+    else await initAnalytics(config);
+    return;
+  }
+  // Off, including a start still in flight (#2197).
+  if (enabled || starting) optOut();
+  // Off from the start: nothing buffered may ever leave this tab. A null
+  // setting is unknown (the first fetch failed), not off, so the buffer stays
+  // for a later answer to decide (#2196).
+  else if (config) discardEarlyErrors();
 }
 
 /** Hard runtime opt-out: stop PostHog and Sentry in this tab without a reload. */
 export function optOut(): void {
   enabled = false;
+  wanted = false;
+  // Errors buffered so far belong to this opted-out tab; drop them (#2197).
+  discardEarlyErrors();
   try {
     posthog?.opt_out_capturing();
   } catch {
     // ignore
   }
+  sentryRunning = false;
   void import("@sentry/react")
     .then((Sentry) => {
       Sentry.getClient()?.close();
@@ -289,9 +347,13 @@ export function optOut(): void {
     .catch(() => {});
 }
 
-/** Reverse a prior optOut() in this tab: resume PostHog capture without a reload. */
+/**
+ * Reverse a prior optOut() in this tab without a reload: resume PostHog
+ * capture, and start Sentry again, since optOut() closed it (#2197).
+ */
 export function optIn(): void {
   enabled = true;
+  wanted = true;
   try {
     // captureEventName: false: resuming capture is not a per-user consent signal
     // in this product, so don't emit a noisy $opt_in event (see initAnalytics).
@@ -299,4 +361,5 @@ export function optIn(): void {
   } catch {
     // ignore
   }
+  if (sentryConfig && !sentryRunning) void startSentry(sentryConfig);
 }
