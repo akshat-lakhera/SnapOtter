@@ -1,6 +1,7 @@
 // apps/web/src/components/editor/stage-capture.ts
 import type Konva from "konva";
 import { toast } from "sonner";
+import { useEditorStore } from "@/stores/editor-store";
 
 /**
  * Capture the editor document as a flat HTMLCanvasElement at document-pixel
@@ -92,14 +93,19 @@ function canvasIsDead(ctx: CanvasRenderingContext2D): boolean {
 }
 
 // What a browser throws when a canvas is too big to read back: RangeError from the
-// pixel buffer in Chromium and WebKit, IndexSizeError for an empty source,
-// InvalidStateError from Firefox past its limit ("Canvas exceeds max size"), and
-// NS_ERROR_FAILURE in Firefox. Anything else is a bug and is left to propagate.
+// pixel buffer in Chromium, IndexSizeError for an empty source, InvalidStateError
+// from WebKit (a live canvas whose buffer can't be allocated) and from Firefox past
+// its limit ("Canvas exceeds max size"), and in Firefox an exception that is not an
+// Error at all, with the code in `name` and an empty message (NS_ERROR_FAILURE from
+// the probe, NS_ERROR_OUT_OF_MEMORY from a full read). Anything else is a bug and is
+// left to propagate.
 function isCanvasSizeError(err: unknown): boolean {
   if (err instanceof RangeError) return true;
   if (err instanceof DOMException) {
     return err.name === "IndexSizeError" || err.name === "InvalidStateError";
   }
+  const name = (err as { name?: unknown } | null)?.name;
+  if (name === "NS_ERROR_FAILURE" || name === "NS_ERROR_OUT_OF_MEMORY") return true;
   return err instanceof Error && err.message.includes("NS_ERROR_FAILURE");
 }
 
@@ -135,6 +141,46 @@ export function classifyCaptureError(err: unknown): CaptureFailure | null {
   if (err instanceof DOMException && err.name === "SecurityError") return "tainted";
   if (isCanvasSizeError(err)) return "no-context";
   return null;
+}
+
+/**
+ * The stroke canvas as a data URL, or null when it's past the browser's limit:
+ * Chromium and WebKit answer "data:," there instead of throwing, and that string
+ * would become an object's `src` that never renders (#2141).
+ */
+export function strokeToDataUrl(canvas: HTMLCanvasElement): string | null {
+  try {
+    const url = canvas.toDataURL();
+    return url === "data:," ? null : url;
+  } catch (err) {
+    if (isCanvasSizeError(err)) return null;
+    throw err;
+  }
+}
+
+/**
+ * End a brush stroke: swap the object's live canvas for its encoded PNG. When the
+ * canvas can't be encoded the object would render nothing, so it is removed and the
+ * user told. Returns whether the stroke was kept.
+ */
+export function finishStroke(
+  objectId: string,
+  canvas: HTMLCanvasElement,
+  messages: CaptureFailureMessages,
+): boolean {
+  const dataUrl = strokeToDataUrl(canvas);
+  const { updateObject, removeObjects } = useEditorStore.getState();
+  if (!dataUrl) {
+    // The object still points at the live stroke canvas. Cut that loose first:
+    // the delete is an undo step, and undoing it must not bring back a stroke
+    // that never saved, nor keep the canvas that couldn't be encoded alive.
+    updateObject(objectId, { image: undefined } as unknown as Record<string, unknown>);
+    removeObjects([objectId]);
+    reportCaptureFailure("no-context", messages);
+    return false;
+  }
+  updateObject(objectId, { src: dataUrl, image: undefined } as unknown as Record<string, unknown>);
+  return true;
 }
 
 /**
