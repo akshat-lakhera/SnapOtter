@@ -7,6 +7,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { format } from "@/lib/format";
 import {
   FRAME_HANDLING_FAILED,
@@ -202,6 +203,10 @@ export function ocrOneFile(
     // the server already took async, whose XHR is done and won't abort. The
     // error never reaches the UI: the scan writes nothing more for this file.
     callbacks.onStoppable?.(() => {
+      // Only a file the server queued has a job to cancel, and only one that is
+      // still unsettled has a job still running (#2093).
+      // Posted first, so a teardown step that throws can't leave the job running.
+      if (asyncMode && !settled) void cancelAbandonedJob(clientJobId, "ocr");
       rejectOnce(new Error("OCR scan stopped"));
       xhr.abort();
     });

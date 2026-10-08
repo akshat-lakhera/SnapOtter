@@ -1405,6 +1405,35 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     expect(useFileStore.getState().error).toBeNull();
   });
 
+  it("cancels the job the server already queued for the file it drops (#2093)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.respond(202, { jobId: "queued", async: true });
+
+    unmount();
+    moveToAnotherTool();
+
+    const clientJobId = first.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends no cancel for a file the server never answered (#2093)", async () => {
+    const { unmount } = renderPanel(3);
+    await submit(1);
+
+    unmount();
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
   it("stops at the file in flight when the files go after one has finished", async () => {
     renderPanel(3);
     const first = await submit(1);
@@ -1565,6 +1594,33 @@ describe("erase-object single file: leaving the page mid-run (#1975)", () => {
     expect(entry(0).processedUrl).toBeNull();
     expect(useFileStore.getState().processing).toBe(false);
     expect(useFileStore.getState().error).toBeNull();
+  });
+
+  it("cancels the queued job of a 202 run when the files go (#2093)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    moveToAnotherTool();
+
+    const clientJobId = xhr.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends no cancel when the files go before the server has answered (#2093)", async () => {
+    renderPanel();
+    await submit();
+
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 
   it("replacing the files from the library ends the run and clears processing", async () => {
