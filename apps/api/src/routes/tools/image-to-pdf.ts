@@ -112,6 +112,22 @@ export async function flattenAlpha(buf: Buffer): Promise<Buffer> {
   return buf;
 }
 
+/**
+ * Read back an output this route wrote a moment ago. A failure here is never
+ * the client's: an error without a 5xx status is tagged 500 so it reaches the
+ * error handler instead of the route's 422 catch-all (#2120).
+ */
+async function readOwnOutput(key: string): Promise<Buffer> {
+  try {
+    return await getObjectBuffer(key);
+  } catch (err) {
+    if (hasServerErrorStatus(err)) throw err;
+    throw Object.assign(new Error("Could not read back a stored output", { cause: err }), {
+      statusCode: 500,
+    });
+  }
+}
+
 export function registerImageToPdfRoute(
   app: FastifyInstance,
   opts: { toolId: string; accept?: string[] },
@@ -342,7 +358,7 @@ export function registerImageToPdfRoute(
         archive.on("error", reject);
       });
       for (const name of pdfNames) {
-        const buf = await getObjectBuffer(`outputs/${jobId}/${name}`);
+        const buf = await readOwnOutput(`outputs/${jobId}/${name}`);
         archive.append(buf, { name });
       }
       await archive.finalize();
@@ -362,6 +378,7 @@ export function registerImageToPdfRoute(
     } catch (err) {
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
+      request.log.error({ err, toolId: opts.toolId }, "PDF creation failed");
       return reply.status(422).send({
         error: "PDF creation failed",
         details: err instanceof Error ? err.message : "Unknown error",
