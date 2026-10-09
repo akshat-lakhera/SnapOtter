@@ -123,22 +123,21 @@ async function upgradeLegacyPasswordHash(
 }
 
 /**
- * Fixed-cost hash used to equalize login timing for usernames that don't
- * exist (or have no local password). Computed once per process and cached;
- * without this, a login attempt for an unknown username returns as soon as
- * the user lookup misses, while a wrong password for a real user waits on a
- * full scrypt run. That gap is a timing side-channel an attacker can use to
- * enumerate valid usernames even though both cases return an identical 401
- * body. Running verifyPassword against this dummy hash pays the same scrypt
- * cost on the "unknown user" path so the two cases are timing-indistinguishable.
+ * Stand-in hash used to equalize login timing for usernames that don't exist (or
+ * have no local password). Without it, a login attempt for an unknown username
+ * returns as soon as the user lookup misses, while a wrong password for a real user
+ * waits on a full scrypt run. That gap is a timing side-channel an attacker can use
+ * to enumerate valid usernames even though both cases return an identical 401 body.
+ * Running verifyUserPassword against this hash pays the same scrypt cost on the
+ * "unknown user" path so the two cases are timing-indistinguishable.
+ *
+ * It only has to be well formed: a salt and a key of the lengths hashPassword makes,
+ * so verifyPassword runs scrypt and the constant-time compare exactly as it does for
+ * a real hash. Its result is discarded, so it never authenticates anyone. A constant,
+ * not a hash built on first use: built lazily, the first unknown-user login after boot
+ * ran one scrypt computation more than a real user's wrong password (#2254).
  */
-let dummyHashPromise: Promise<string> | null = null;
-function getDummyHash(): Promise<string> {
-  if (!dummyHashPromise) {
-    dummyHashPromise = hashPassword(randomBytes(SALT_LENGTH).toString("hex"));
-  }
-  return dummyHashPromise;
-}
+const DUMMY_HASH = `${"0".repeat(SALT_LENGTH * 2)}:${"0".repeat(KEY_LENGTH * 2)}`;
 
 /**
  * Compute a fast lookup prefix for an API key.
@@ -604,7 +603,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (ssoRefused || !user?.passwordHash) {
         // Pay the same scrypt cost a real password check would take, so
         // response timing doesn't reveal whether the username exists.
-        await verifyUserPassword(body.password, await getDummyHash());
+        await verifyUserPassword(body.password, DUMMY_HASH);
         authAttempts.inc({ method: "password", result: "failure" });
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
