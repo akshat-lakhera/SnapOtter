@@ -38,6 +38,7 @@ import {
   extractErrorCode,
   getBundleForTool,
   getOptionalBundleForTool,
+  hasServerErrorStatus,
   isSafeMessageError,
   isToolInputError,
   ONBOARDING_FIRST_PROCESSED_KEY,
@@ -318,6 +319,12 @@ function toolUsedBaseProps(data: ToolJobData, durationMs: number): Record<string
  * "Check QPDF_PATH" hint the route would have sent (#1403).
  */
 function validationErrorFields(err: unknown): { code?: string; details?: string } {
+  // A storage fault raised as a SafeError (the workspace cap, a full or
+  // unwritable volume) keeps its code too, so a route reading the row answers
+  // it as the fault it is (#2210).
+  if (isSafeMessageError(err) && hasServerErrorStatus(err)) {
+    return typeof err.code === "string" ? { code: err.code } : {};
+  }
   if (!(err instanceof Error) || err.name !== "InputValidationError") return {};
   const { code, details } = err as { code?: unknown; details?: unknown };
   return {
@@ -327,16 +334,19 @@ function validationErrorFields(err: unknown): { code?: string; details?: string 
 }
 
 /**
- * The HTTP status a rejected input deserves, kept on the failed job row so a
+ * The HTTP status a failed job deserves, kept on the failed job row so a
  * route waiting on the job answers it instead of a generic 422 (#1742). The
  * error itself doesn't survive the queue, so the row is the only carrier, and
  * the failed progress frame rewrites that row, so it has to carry it too.
  */
-function inputErrorStatus(err: unknown): { httpStatus?: number } {
+function failureStatus(err: unknown): { httpStatus?: number } {
   if (err instanceof Error && err.name === "InputValidationError") {
     const statusCode = (err as { statusCode?: unknown }).statusCode;
     return { httpStatus: typeof statusCode === "number" ? statusCode : 400 };
   }
+  // Any other error that already says it is the server's (a storage fault, a
+  // failed write) keeps its status instead of reading as a bad file (#2210).
+  if (hasServerErrorStatus(err)) return { httpStatus: err.statusCode };
   return isToolInputError(err) ? { httpStatus: 400 } : {};
 }
 
@@ -817,8 +827,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             durationMs,
             error: {
               message: friendlyError(finalError),
-              ...validationErrorFields(err),
-              ...(!isCanceled && !isTimeout && inputErrorStatus(err)),
+              // The fault's own code and status belong on a job that failed
+              // on it; a timeout or a cancel that one raced is not that
+              // failure, and its row says so (#2210).
+              ...(!isCanceled && !isTimeout && validationErrorFields(err)),
+              ...(!isCanceled && !isTimeout && failureStatus(err)),
             },
           })
           .where(eq(schema.jobs.id, jobId))
@@ -883,8 +896,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             phase: "failed",
             percent: 0,
             error: friendlyError(finalError),
-            ...validationErrorFields(err),
-            ...(!isTimeout && inputErrorStatus(err)),
+            ...(!isTimeout && validationErrorFields(err)),
+            ...(!isTimeout && failureStatus(err)),
           });
         }
       }
