@@ -939,7 +939,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // the user is told the change failed and a retry with the old password
       // works, instead of a new password beside surviving sessions and keys (#2089).
       const currentToken = extractToken(request);
-      await db.transaction(async (tx) => {
+      const outcome = await db.transaction(async (tx) => {
+        // Lock the row and check the password is still the one just verified.
+        // Two requests that both proved the old password otherwise both
+        // write, and the first caller is told a change succeeded that the
+        // second one overwrote (#2127). The lock also orders the revokes below
+        // after any concurrent change has committed. NO KEY UPDATE, not
+        // UPDATE: it still excludes every other writer of this row, but
+        // doesn't hold up inserts that only reference it (sessions, keys,
+        // audit rows).
+        const [locked] = await tx
+          .select({ passwordHash: schema.users.passwordHash })
+          .from(schema.users)
+          .where(eq(schema.users.id, authUser.id))
+          .for("no key update");
+        if (!locked) return "gone" as const;
+        if (locked.passwordHash !== user.passwordHash) return "changed" as const;
+
         await tx
           .update(schema.users)
           .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
@@ -956,7 +972,21 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
         // Revoke all API keys - if credentials were compromised, keys must be rotated too
         await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
+        return "changed-here" as const;
       });
+
+      if (outcome === "gone") {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
+      if (outcome === "changed") {
+        // Another change won: the user's own in another tab, an admin reset,
+        // or a SCIM deprovision. Nothing was written here.
+        request.log.info({ userId: authUser.id }, "Password change lost to a concurrent change");
+        return reply.status(409).send({
+          error: "Your password was changed elsewhere. Sign in again.",
+          code: "PASSWORD_CHANGED",
+        });
+      }
 
       await auditFromRequest(request)("PASSWORD_CHANGED", {
         userId: authUser.id,
