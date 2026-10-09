@@ -50,10 +50,12 @@ describe("POST /api/v1/preview/generate upload limit", () => {
     });
 
     expect(res.statusCode).toBe(413);
-    // The test app doesn't install plugins/error-handler.ts, so the body is
-    // Fastify's default shape ({ error: "Payload Too Large", message }); in
-    // production the handler puts the message under `error`. Either way the
-    // reason travels with it.
+    // The test app doesn't install plugins/error-handler.ts (#1243), so the
+    // body is Fastify's default shape ({ error: "Payload Too Large", message:
+    // "request file too large" }). Production's handler answers the way the
+    // tool routes do, { error: "File exceeds the 10 MB upload limit" } (#2225;
+    // tests/unit/api/error-handler.test.ts pins it). Once the test app
+    // installs the handler, assert that exact body here.
     expect(res.body).toMatch(/file too large/i);
   });
 
