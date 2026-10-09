@@ -26,6 +26,7 @@ import {
   recordLoginFailure,
 } from "../lib/login-throttle.js";
 import { authAttempts } from "../lib/metrics.js";
+import { normalizePassword, passwordCandidates } from "../lib/password-form.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
 import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
 import { userLimitReached } from "../lib/user-limit.js";
@@ -70,6 +71,58 @@ export async function verifyPassword(password: string, stored: string): Promise<
 }
 
 /**
+ * Check a typed password against a stored user hash (#2056). The normalized form is
+ * tried first, since that is what every hash made from now on is built from; when the
+ * text as typed differs from it, that is tried second, because a hash made before
+ * normalization was built from the raw text. `legacy` says the second try is the one
+ * that matched, so the caller can upgrade the hash. API keys and SCIM tokens do not go
+ * through this; they are compared as they are with verifyPassword.
+ *
+ * The number of scrypt runs depends only on the typed text, never on whether the user
+ * exists: the unknown-user path in login runs this same function against a dummy hash.
+ */
+async function verifyUserPassword(
+  password: string,
+  stored: string,
+): Promise<{ valid: boolean; legacy: boolean }> {
+  for (const [index, candidate] of passwordCandidates(password).entries()) {
+    if (await verifyPassword(candidate, stored)) return { valid: true, legacy: index > 0 };
+  }
+  return { valid: false, legacy: false };
+}
+
+/**
+ * Re-hash a password that matched only as typed (a hash from before #2056) from its
+ * normalized form, so the other spelling of it works from now on. Best effort: the
+ * sign-in already succeeded. The update names the hash it verified, so it can never
+ * overwrite a password changed in the meantime.
+ */
+async function upgradeLegacyPasswordHash(
+  request: FastifyRequest,
+  userId: string,
+  verifiedHash: string,
+  password: string,
+): Promise<void> {
+  try {
+    const upgraded = await hashPassword(normalizePassword(password));
+    await db
+      .update(schema.users)
+      .set({ passwordHash: upgraded })
+      .where(and(eq(schema.users.id, userId), eq(schema.users.passwordHash, verifiedHash)));
+  } catch (err) {
+    request.log.warn({ err, userId }, "Could not upgrade a password hash to its normalized form");
+    // request.log has no Sentry bridge, and a fault that persists leaves the other
+    // spelling of this password failing for good, so it has to be seen (#2056).
+    void reportError(err, {
+      source: "http",
+      route: request.routeOptions?.url,
+      method: request.method,
+      subsystem: "password-hash-upgrade",
+    });
+  }
+}
+
+/**
  * Fixed-cost hash used to equalize login timing for usernames that don't
  * exist (or have no local password). Computed once per process and cached;
  * without this, a login attempt for an unknown username returns as soon as
@@ -109,7 +162,9 @@ interface PasswordRuleFailure {
   minLength?: number;
 }
 
-async function validatePasswordStrength(password: string): Promise<PasswordRuleFailure | null> {
+async function validatePasswordStrength(typed: string): Promise<PasswordRuleFailure | null> {
+  // The rules judge the text that will be hashed, not the spelling it was typed in (#2056).
+  const password = normalizePassword(typed);
   // A control character can be saved but never typed back: login refuses NUL
   // outright and browsers strip LF and CR from password inputs (#2055).
   if (/\p{Cc}/u.test(password)) {
@@ -142,7 +197,12 @@ async function validatePasswordStrength(password: string): Promise<PasswordRuleF
   // Characters, not UTF-16 code units: an astral character is two units, so four
   // of them used to meet a minimum of 8 (#2057). Code points are what NIST SP
   // 800-63B counts. It only runs when a password is set, so it locks nobody out.
-  if ([...password].length < minLength)
+  // The count is the smaller of the composed form and the NFKC form: the composed
+  // form so a letter typed as a base plus a combining mark is one character, and
+  // the NFKC form so a compatibility character that expands (U+FDFA becomes 18)
+  // is not credited for the letters it turns into (#2056).
+  const length = Math.min([...typed.normalize("NFC")].length, [...password].length);
+  if (length < minLength)
     broken.push({
       rule: "minLength",
       message: `Password must be at least ${minLength} characters`,
@@ -307,7 +367,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
   if (existingUsers.length > 0) return;
 
   const id = randomUUID();
-  const passwordHash = await hashPassword(env.DEFAULT_PASSWORD);
+  const passwordHash = await hashPassword(normalizePassword(env.DEFAULT_PASSWORD));
 
   const mustChange = !env.SKIP_MUST_CHANGE_PASSWORD;
   const result = await db
@@ -534,7 +594,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (ssoRefused || !user?.passwordHash) {
         // Pay the same scrypt cost a real password check would take, so
         // response timing doesn't reveal whether the username exists.
-        await verifyPassword(body.password, await getDummyHash());
+        await verifyUserPassword(body.password, await getDummyHash());
         authAttempts.inc({ method: "password", result: "failure" });
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
@@ -553,7 +613,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
-      const valid = await verifyPassword(body.password, user.passwordHash);
+      const { valid, legacy } = await verifyUserPassword(body.password, user.passwordHash);
       if (!valid) {
         authAttempts.inc({ method: "password", result: "failure" });
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
@@ -581,6 +641,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           reason: "disabled_user",
         });
         return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
+      }
+
+      // Before the MFA branch, which never sees the password again.
+      if (legacy) {
+        await upgradeLegacyPasswordHash(request, user.id, user.passwordHash, body.password);
       }
 
       // Two failures used to share one silent catch here and they want
@@ -926,14 +991,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const valid = await verifyPassword(body.currentPassword, user.passwordHash);
+      const { valid } = await verifyUserPassword(body.currentPassword, user.passwordHash);
       if (!valid) {
         return reply
           .status(401)
           .send({ error: "Current password is incorrect", code: "INVALID_PASSWORD" });
       }
 
-      const newHash = await hashPassword(body.newPassword);
+      const newHash = await hashPassword(normalizePassword(body.newPassword));
 
       // One transaction: if a revoke fails the old password stays in place, so
       // the user is told the change failed and a retry with the old password
@@ -1131,7 +1196,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const id = randomUUID();
     // Hash before the transaction: scrypt takes ~100ms and must not extend
     // the user-limit lock window.
-    const passwordHash = await hashPassword(body.password);
+    const passwordHash = await hashPassword(normalizePassword(body.password));
 
     // The duplicate pre-check above can't close the username race (issue
     // #900), and a plain count check can't close the limit race: two
@@ -1342,7 +1407,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const newHash = await hashPassword(body.newPassword);
+      const newHash = await hashPassword(normalizePassword(body.newPassword));
 
       // One transaction, for the same reason as change-password (#2089).
       await db.transaction(async (tx) => {
