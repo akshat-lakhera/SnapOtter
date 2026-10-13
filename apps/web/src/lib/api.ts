@@ -241,19 +241,11 @@ export async function apiDelete<T>(path: string): Promise<T> {
 }
 
 export function setToken(token: string) {
-  try {
-    getBrowserStorage()?.setItem("snapotter-token", token);
-  } catch (error) {
-    console.error("Failed to save auth token to browser storage.", error);
-  }
+  getBrowserStorage()?.setItem("snapotter-token", token);
 }
 
 export function clearToken() {
-  try {
-    getBrowserStorage()?.removeItem("snapotter-token");
-  } catch (error) {
-    console.error("Failed to clear auth token from browser storage.", error);
-  }
+  getBrowserStorage()?.removeItem("snapotter-token");
 }
 
 // ── File Upload / Download ──────────────────────────────────────

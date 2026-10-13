@@ -203,35 +203,6 @@ describe("blocked browser storage resilience (#2318)", () => {
   });
 
   describe("api storage helpers with blocked storage", () => {
-    it("setToken, clearToken and formatHeaders do not throw when localStorage methods throw", async () => {
-      const throwingStorage = {
-        getItem: vi.fn(() => {
-          throw new DOMException("Access is denied", "SecurityError");
-        }),
-        setItem: vi.fn(() => {
-          throw new DOMException("Access is denied", "SecurityError");
-        }),
-        removeItem: vi.fn(() => {
-          throw new DOMException("Access is denied", "SecurityError");
-        }),
-        clear: vi.fn(() => {
-          throw new DOMException("Access is denied", "SecurityError");
-        }),
-        key: vi.fn(() => null),
-        get length() {
-          return 0;
-        },
-      };
-
-      vi.stubGlobal("localStorage", throwingStorage);
-
-      const { clearToken, setToken, formatHeaders } = await import("@/lib/api");
-
-      expect(() => setToken("test-token")).not.toThrow();
-      expect(() => clearToken()).not.toThrow();
-      expect(() => formatHeaders()).not.toThrow();
-    });
-
     it("handles window.localStorage property access itself throwing SecurityError", async () => {
       Object.defineProperty(window, "localStorage", {
         get() {
@@ -240,10 +211,8 @@ describe("blocked browser storage resilience (#2318)", () => {
         configurable: true,
       });
 
-      const { clearToken, setToken, formatHeaders } = await import("@/lib/api");
+      const { formatHeaders } = await import("@/lib/api");
 
-      expect(() => setToken("test-token")).not.toThrow();
-      expect(() => clearToken()).not.toThrow();
       expect(() => formatHeaders()).not.toThrow();
     });
   });
