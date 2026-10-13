@@ -422,7 +422,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
   // from such a value could never sign in (#2085).
   if (/\p{Cc}/u.test(env.DEFAULT_PASSWORD)) {
     throw new Error(
-      "DEFAULT_PASSWORD must not contain control characters (a trailing newline from a quoted compose or .env value is the usual cause)",
+      "DEFAULT_PASSWORD must not contain control characters (a trailing newline from a quoted compose or .env value, or Windows line endings in a secret file, is the usual cause)",
     );
   }
   // Login refuses an empty password and one past the cap, so either makes an
@@ -443,10 +443,16 @@ export async function ensureDefaultAdmin(): Promise<void> {
     );
   }
 
+  const usernameError = validateUsername(env.DEFAULT_USERNAME);
+  if (usernameError) {
+    throw new Error(`DEFAULT_USERNAME is invalid: ${usernameError}`);
+  }
+
   const id = randomUUID();
   const passwordHash = await hashPassword(normalizePassword(env.DEFAULT_PASSWORD));
 
   const mustChange = !env.SKIP_MUST_CHANGE_PASSWORD;
+
   const result = await db
     .insert(schema.users)
     .values({

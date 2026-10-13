@@ -129,6 +129,12 @@ describe("editor menu bar hints name keys that run the command (#1943)", () => {
     expect(menuHints("file").get("export-as")).toBe("Ctrl+Shift+S");
   });
 
+  it("shows Select All on Ctrl+A, the key that makes a full-canvas pixel selection (#1964)", () => {
+    onWindows();
+    renderMenuBar();
+    expect(menuHints("select").get("all")).toBe("Ctrl+A");
+  });
+
   it.each([
     ["file", "new"],
     ["file", "open"],
@@ -136,8 +142,6 @@ describe("editor menu bar hints name keys that run the command (#1943)", () => {
     ["file", "close"],
     ["image", "image-size"],
     ["image", "canvas-size"],
-    // Ctrl+A selects every object; this row makes a pixel selection instead.
-    ["select", "all"],
   ])("shows no hint on %s > %s, which no key runs", (menu, id) => {
     onWindows();
     renderMenuBar();
@@ -174,10 +178,48 @@ describe("editor menu bar hints name keys that run the command (#1943)", () => {
     fireEvent.keyDown(document, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
     expect(onExport).toHaveBeenCalledTimes(1);
   });
+
+  it("makes a full-canvas pixel selection on Ctrl+A and selects objects on Alt+Ctrl+A (#1964)", () => {
+    onWindows();
+    useEditorStore.setState({
+      canvasSize: { width: 800, height: 600 },
+      selection: {
+        type: "rect",
+        points: [10, 10, 50, 10, 50, 50, 10, 50],
+        bounds: { x: 10, y: 10, width: 40, height: 40 },
+      },
+      objects: [{ id: "obj-1" } as any],
+      selectedObjectIds: ["obj-1"],
+    });
+    renderHook(() => useEditorShortcuts());
+
+    // Ctrl+A -> pixel selection over the whole canvas, clears object selection
+    fireEvent.keyDown(document, { key: "a", code: "KeyA", ctrlKey: true });
+    expect(useEditorStore.getState().selection).toEqual({
+      type: "rect",
+      points: [0, 0, 800, 0, 800, 600, 0, 600],
+      bounds: { x: 0, y: 0, width: 800, height: 600 },
+    });
+    expect(useEditorStore.getState().selectedObjectIds).toEqual([]);
+
+    // Restore pixel selection
+    useEditorStore.setState({
+      selection: {
+        type: "rect",
+        points: [10, 10, 50, 10, 50, 50, 10, 50],
+        bounds: { x: 10, y: 10, width: 40, height: 40 },
+      },
+    });
+
+    // Alt+Ctrl+A -> selects all objects, clears pixel selection
+    fireEvent.keyDown(document, { key: "a", code: "KeyA", ctrlKey: true, altKey: true });
+    expect(useEditorStore.getState().selectedObjectIds).toEqual(["obj-1"]);
+    expect(useEditorStore.getState().selection).toBeNull();
+  });
 });
 
-describe("editor canvas context menu (#1943)", () => {
-  it("shows no Ctrl+A on Select All, which makes a pixel selection rather than selecting objects", () => {
+describe("editor canvas context menu (#1943, #1964)", () => {
+  it("shows Ctrl+A on Select All, matching the key that makes a full-canvas pixel selection", () => {
     onWindows();
     render(
       <I18nProvider>
@@ -186,6 +228,6 @@ describe("editor canvas context menu (#1943)", () => {
     );
     const label = en.editor.ui.contextMenu.selectAll;
     const row = screen.getByRole("button", { name: new RegExp(`^${label}`) });
-    expect((row.textContent ?? "").slice(label.length)).toBe("");
+    expect((row.textContent ?? "").slice(label.length)).toBe("Ctrl+A");
   });
 });

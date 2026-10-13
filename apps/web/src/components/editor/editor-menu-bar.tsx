@@ -91,6 +91,7 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
   const pasteInPlace = useEditorStore((s) => s.pasteInPlace);
   const removeObjects = useEditorStore((s) => s.removeObjects);
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
+  const setSelectedObjects = useEditorStore((s) => s.setSelectedObjects);
   const bringToFront = useEditorStore((s) => s.bringToFront);
   const bringForward = useEditorStore((s) => s.bringForward);
   const sendBackward = useEditorStore((s) => s.sendBackward);
@@ -337,9 +338,9 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
         {
           id: "all",
           label: m.select.all,
-          // No hint: mod+a selects every object, while this row makes a
-          // pixel selection over the canvas.
-          action: () =>
+          shortcut: hint("mod+A"),
+          action: () => {
+            setSelectedObjects([]);
             setSelection({
               type: "rect",
               points: [
@@ -353,7 +354,8 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
                 canvasSize.height,
               ],
               bounds: { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height },
-            }),
+            });
+          },
         },
         {
           id: "deselect",

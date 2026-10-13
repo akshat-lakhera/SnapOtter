@@ -403,14 +403,33 @@ export function useEditorShortcuts(callbacks?: {
     return () => window.removeEventListener("keydown", handler, { capture: true });
   }, []);
 
-  // Ctrl+A / Cmd+A - Select all
+  // Ctrl+A / Cmd+A - Select all (pixel selection over the whole canvas)
   useHotkeys(
     "mod+a",
     (e) => {
       if (isInputFocused()) return;
       e.preventDefault();
       const state = useEditorStore.getState();
+      const { width, height } = state.canvasSize;
+      state.setSelectedObjects([]);
+      state.setSelection({
+        type: "rect",
+        points: [0, 0, width, 0, width, height, 0, height],
+        bounds: { x: 0, y: 0, width, height },
+      });
+    },
+    { preventDefault: true },
+  );
+
+  // Alt+Ctrl+A / Option+Cmd+A - Select all objects/layers
+  useHotkeys(
+    "alt+mod+a",
+    (e) => {
+      if (isInputFocused()) return;
+      e.preventDefault();
+      const state = useEditorStore.getState();
       const allIds = state.objects.map((o) => o.id);
+      state.setSelection(null);
       state.setSelectedObjects(allIds);
     },
     { preventDefault: true },
