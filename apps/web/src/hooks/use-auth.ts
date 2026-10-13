@@ -143,8 +143,8 @@ export function useAuth() {
         } else {
           try {
             clearToken();
-          } catch {
-            // Storage blocked or unavailable
+          } catch (error) {
+            console.error("Unexpected error during auth state teardown.", error);
           }
           if (!cancelled)
             setState({

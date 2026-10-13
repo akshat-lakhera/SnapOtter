@@ -63,8 +63,8 @@ function detectLocale(): string {
   try {
     const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
     if (stored) return stored;
-  } catch {
-    // Storage blocked or unavailable
+  } catch (error) {
+    console.warn("Failed to read locale preference from browser storage.", error);
   }
 
   const codes = SUPPORTED_LOCALES.map((l) => l.code);
@@ -106,8 +106,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     let hasExplicitChoice: string | null = null;
     try {
       hasExplicitChoice = localStorage.getItem(LOCALE_STORAGE_KEY);
-    } catch {
-      // Storage blocked or unavailable
+    } catch (error) {
+      console.warn("Failed to persist locale preference to browser storage.", error);
     }
     if (hasExplicitChoice) return;
 

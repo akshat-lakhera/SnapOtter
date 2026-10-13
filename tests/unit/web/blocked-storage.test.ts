@@ -32,6 +32,35 @@ describe("blocked browser storage resilience (#2318)", () => {
   });
 
   describe("useAuth with blocked storage", () => {
+    it("sets authenticated state and finishes loading when session succeeds but localStorage property access throws", async () => {
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ authEnabled: true }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ user: { id: "1" }, session: {} }),
+        });
+
+      Object.defineProperty(window, "localStorage", {
+        get() {
+          throw new DOMException("Access is denied", "SecurityError");
+        },
+        configurable: true,
+      });
+
+      const { renderHook } = await import("@testing-library/react");
+      const { useAuth } = await import("@/hooks/use-auth");
+
+      const { result } = renderHook(() => useAuth());
+      await act(async () => {});
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.authEnabled).toBe(true);
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+
     it("sets unauthenticated state and finishes loading when session fails and localStorage.removeItem throws", async () => {
       fetchMock
         .mockResolvedValueOnce({
@@ -106,6 +135,32 @@ describe("blocked browser storage resilience (#2318)", () => {
   });
 
   describe("i18n-context with blocked storage", () => {
+    it("detectLocale falls back to default locale and I18nProvider renders when window.localStorage property access throws", async () => {
+      Object.defineProperty(window, "localStorage", {
+        get() {
+          throw new DOMException("Access is denied", "SecurityError");
+        },
+        configurable: true,
+      });
+
+      const { renderHook, act } = await import("@testing-library/react");
+      const { I18nProvider, useTranslation } = await import("@/contexts/i18n-context");
+
+      const { result, unmount } = renderHook(() => useTranslation(), {
+        wrapper: I18nProvider,
+      });
+
+      expect(result.current.locale).toBe("en");
+
+      // Changing locale must not crash even when setItem throws
+      await act(async () => {
+        result.current.setLocale("es");
+      });
+
+      expect(result.current.locale).toBe("es");
+      unmount();
+    });
+
     it("detectLocale falls back to default locale and I18nProvider renders without throwing", async () => {
       const throwingStorage = {
         getItem: vi.fn(() => {
@@ -148,7 +203,7 @@ describe("blocked browser storage resilience (#2318)", () => {
   });
 
   describe("api storage helpers with blocked storage", () => {
-    it("getToken, setToken, clearToken and formatHeaders do not throw when localStorage methods throw", async () => {
+    it("setToken, clearToken and formatHeaders do not throw when localStorage methods throw", async () => {
       const throwingStorage = {
         getItem: vi.fn(() => {
           throw new DOMException("Access is denied", "SecurityError");

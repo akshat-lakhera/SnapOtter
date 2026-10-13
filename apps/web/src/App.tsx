@@ -238,8 +238,8 @@ export function App() {
           duration: 5000,
         });
       }
-    } catch {
-      // Storage blocked or unavailable
+    } catch (error) {
+      console.warn("Could not access browser storage to handle welcome flag.", error);
     }
   }, []);
 

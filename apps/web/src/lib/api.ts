@@ -79,7 +79,8 @@ export function failedAnswerMessage(
 function getBrowserStorage(): Storage | null {
   try {
     return typeof window !== "undefined" ? window.localStorage : null;
-  } catch {
+  } catch (error) {
+    console.warn("Browser storage access denied. Authentication state will not persist.", error);
     return null;
   }
 }
@@ -242,16 +243,16 @@ export async function apiDelete<T>(path: string): Promise<T> {
 export function setToken(token: string) {
   try {
     getBrowserStorage()?.setItem("snapotter-token", token);
-  } catch {
-    // Storage blocked or unavailable
+  } catch (error) {
+    console.error("Failed to save auth token to browser storage.", error);
   }
 }
 
 export function clearToken() {
   try {
     getBrowserStorage()?.removeItem("snapotter-token");
-  } catch {
-    // Storage blocked or unavailable
+  } catch (error) {
+    console.error("Failed to clear auth token from browser storage.", error);
   }
 }
 
