@@ -524,7 +524,9 @@ function GeneralSection() {
         label={t.settings.general.appVersionLabel}
         description={t.settings.general.appVersionDescription}
       >
-        <span className="text-sm font-mono text-muted-foreground">{APP_VERSION}</span>
+        <span data-testid="app-version" className="text-sm font-mono text-muted-foreground">
+          {APP_VERSION}
+        </span>
       </SettingRow>
 
       <div className="flex items-center gap-3 pt-2">
@@ -1163,11 +1165,18 @@ export function AdminSecuritySettings() {
       originalSettingsRef.current = { ...settings };
       setSaveMsg({ type: "success", text: t.settings.security.securitySettingsSaved });
     } catch (err) {
-      // A refused value comes back with the setting's key: name its row.
-      const refused =
+      // A refused value comes back with the setting's key: name its row and put
+      // the row back where it was, so the tab doesn't keep showing a value the
+      // server never accepted (and doesn't send it again on the next save).
+      const refusedKey =
         err instanceof ApiError && typeof err.body.setting === "string"
-          ? securitySettingLabel(t, err.body.setting)
+          ? err.body.setting
           : undefined;
+      if (refusedKey) {
+        const saved = originalSettingsRef.current[refusedKey] ?? "";
+        setSettings((prev) => ({ ...prev, [refusedKey]: saved }));
+      }
+      const refused = refusedKey ? securitySettingLabel(t, refusedKey) : undefined;
       setSaveMsg({
         type: "error",
         text: apiErrorMessage(
@@ -3942,7 +3951,9 @@ function AboutSection() {
         <p className="text-sm text-muted-foreground">{t.settings.about.appDescription}</p>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-muted-foreground">{t.settings.about.versionLabel}</span>
-          <span className="font-mono text-foreground">{APP_VERSION}</span>
+          <span data-testid="app-version" className="font-mono text-foreground">
+            {APP_VERSION}
+          </span>
         </div>
       </div>
 

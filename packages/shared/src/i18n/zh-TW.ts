@@ -5086,6 +5086,7 @@ export const zhTW: TranslationKeys = {
     noSteps: "Pipeline檔案沒有步驟",
     importFailed: "匯入失敗",
     couldNotRead: "無法讀取Pipeline檔案",
+    importListRefreshFailed: "已匯入Pipeline，但已儲存清單未重新整理。請重新載入頁面查看。",
     fileCount: "{count}個檔案",
     fileCountPlural: "{count}個檔案",
     importFromLibrary: "從程式庫匯入",
@@ -5324,6 +5325,8 @@ export const zhTW: TranslationKeys = {
     passwordNeedsSpecial: "密碼必須包含一個特殊字元。",
     passwordNoControlCharacters: "密碼不能包含控制字元。",
     passwordTooLong: "密碼長度最多只能有 {maxLength} 個字元。",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "嘗試次數過多。請等待一分鐘後再試一次。",
     escalationDenied: "此操作需要超出您角色的權限。",
     featureNotLicensed: "這需要企業版授權。",

@@ -5400,6 +5400,8 @@ export const tr: TranslationKeys = {
     noSteps: "Pipeline dosyasında adım yok",
     importFailed: "İçe aktarma başarısız",
     couldNotRead: "Pipeline dosyası okunamadı",
+    importListRefreshFailed:
+      "Pipeline içe aktarıldı ancak kayıtlı liste yenilenmedi. Görmek için sayfayı yenileyin.",
     fileCount: "{count} dosya",
     fileCountPlural: "{count} dosya",
     importFromLibrary: "Kitaplıktan İçe Aktar",
@@ -5644,6 +5646,8 @@ export const tr: TranslationKeys = {
     passwordNeedsSpecial: "Parola bir özel karakter içermelidir.",
     passwordNoControlCharacters: "Parola kontrol karakterleri içermemelidir.",
     passwordTooLong: "Parola en fazla {maxLength} karakter olmalıdır.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
     escalationDenied: "Bu işlem, rolünüzün sahip olduğundan daha fazla erişim gerektirir.",
     featureNotLicensed: "Bunun için kurumsal lisans gerekir.",

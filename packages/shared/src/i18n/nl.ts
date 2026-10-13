@@ -5412,6 +5412,8 @@ export const nl: TranslationKeys = {
     noSteps: "Pipelinebestand heeft geen stappen",
     importFailed: "Importeren mislukt",
     couldNotRead: "Pipelinebestand kon niet worden gelezen",
+    importListRefreshFailed:
+      "Pipeline geïmporteerd, maar de opgeslagen lijst is niet vernieuwd. Laad de pagina opnieuw om hem te zien.",
     fileCount: "{count} bestand",
     fileCountPlural: "{count} bestanden",
     importFromLibrary: "Importeren uit bibliotheek",
@@ -5656,6 +5658,8 @@ export const nl: TranslationKeys = {
     passwordNeedsSpecial: "Het wachtwoord moet een speciaal teken bevatten.",
     passwordNoControlCharacters: "Het wachtwoord mag geen besturingstekens bevatten.",
     passwordTooLong: "Het wachtwoord mag maximaal {maxLength} tekens lang zijn.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Te veel pogingen. Wacht een minuut en probeer het opnieuw.",
     escalationDenied: "Daarvoor heb je meer rechten nodig dan je rol heeft.",
     featureNotLicensed: "Hiervoor is een enterprise-licentie nodig.",

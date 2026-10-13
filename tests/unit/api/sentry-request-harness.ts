@@ -73,6 +73,8 @@ export interface Sent {
    * beforeSend hooks ran: what the integrations alone collected.
    */
   rawRequests: Payload[];
+  /** The raw HTTP strings sent to the webhook target. */
+  rawWebhookRequests: string[];
 }
 
 export interface Harness {
@@ -85,7 +87,10 @@ export interface Harness {
    * transport meanwhile, whatever its kind (#1898). reportError skips the
    * error event itself while analytics is off.
    */
-  sendOptedOut(path: string, init: RequestInit): Promise<string[]>;
+  sendOptedOut(
+    path: string,
+    init: RequestInit,
+  ): Promise<{ itemTypes: string[]; rawWebhookRequests: string[] }>;
   /** A plain GET that leaves an http breadcrumb behind; its response is ignored. */
   ping(path: string): Promise<void>;
   close(): Promise<void>;
@@ -126,6 +131,7 @@ export async function startHarness({
     integrations: buildSentryIntegrations(Sentry, tracing, sentryActive),
     ...(tracing ? { tracesSampler: buildTracesSampler(1) as never } : {}),
     sendClientReports: false,
+    tracePropagationTargets: [],
     beforeSend: ((event: Payload, hint: Parameters<typeof beforeSend>[1]) => {
       recordRaw(event);
       return beforeSend(event, hint);
@@ -179,9 +185,17 @@ export async function startHarness({
   });
   // Stands in for Slack's and Discord's servers. A bare TCP listener, so the
   // SDK records only our outgoing side of the call, as it would in production.
+  const webhookRequests: string[] = [];
   const hooks = net.createServer((socket) => {
-    socket.on("error", () => {}); // a reset client must not crash the fork
-    socket.once("data", () => {
+    socket.on("error", (err: NodeJS.ErrnoException) => {
+      // Specifically ignore expected client resets/pipes to prevent fork crashes
+      if (err.code === "ECONNRESET" || err.code === "EPIPE") return;
+
+      // Do not silently swallow other unexpected socket errors
+      console.error("Unexpected socket error in test harness webhook server:", err);
+    });
+    socket.once("data", (data) => {
+      webhookRequests.push(data.toString());
       socket.end("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
     });
   });
@@ -213,6 +227,7 @@ export async function startHarness({
       events.length = 0;
       transactions.length = 0;
       rawRequests.length = 0;
+      webhookRequests.length = 0;
       // With tracing on, arrive inside a sampled upstream trace: the production
       // sampler follows a parent's decision for any request, so this is how a
       // transaction gets recorded for these routes today.
@@ -236,6 +251,7 @@ export async function startHarness({
         event: events[0] as Payload,
         transactions: [...transactions],
         rawRequests: [...rawRequests],
+        rawWebhookRequests: [...webhookRequests],
       };
     },
     async sendOptedOut(path, init) {
@@ -244,6 +260,7 @@ export async function startHarness({
       // Drain anything an earlier request left queued before the window opens.
       await Sentry.flush(100);
       itemTypes.length = 0;
+      webhookRequests.length = 0;
       builtTransactions = 0;
       __setReaderForTests(async () => false);
       await refreshAnalyticsGate();
@@ -256,7 +273,7 @@ export async function startHarness({
         // dropped it, not that nothing was ever sampled.
         expect(builtTransactions).toBeGreaterThan(0);
         await Sentry.flush(100);
-        return [...itemTypes];
+        return { itemTypes: [...itemTypes], rawWebhookRequests: [...webhookRequests] };
       } finally {
         __setReaderForTests(async () => true);
         await refreshAnalyticsGate();

@@ -5376,6 +5376,8 @@ export const vi: TranslationKeys = {
     noSteps: "Tệp Pipeline không có bước nào",
     importFailed: "Nhập thất bại",
     couldNotRead: "Không thể đọc tệp Pipeline",
+    importListRefreshFailed:
+      "Đã nhập Pipeline, nhưng danh sách đã lưu không được làm mới. Hãy tải lại trang để xem.",
     fileCount: "{count} tệp",
     fileCountPlural: "{count} tệp",
     importFromLibrary: "Nhập từ thư viện",
@@ -5618,6 +5620,8 @@ export const vi: TranslationKeys = {
     passwordNeedsSpecial: "Mật khẩu phải chứa một ký tự đặc biệt.",
     passwordNoControlCharacters: "Mật khẩu không được chứa ký tự điều khiển.",
     passwordTooLong: "Mật khẩu chỉ được dài tối đa {maxLength} ký tự.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Quá nhiều lần thử. Hãy đợi một phút rồi thử lại.",
     escalationDenied: "Việc này cần quyền truy cập cao hơn vai trò của bạn.",
     featureNotLicensed: "Tính năng này cần giấy phép doanh nghiệp.",

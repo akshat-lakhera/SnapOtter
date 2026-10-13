@@ -12,11 +12,10 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import { SafeError } from "@snapotter/shared";
-import { and, desc, eq, inArray, isNotNull, like, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, like, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
@@ -44,7 +43,8 @@ import {
 import { decodeHeic } from "../lib/heic-converter.js";
 import { deleteLibraryFileStorage } from "../lib/library-cleanup.js";
 import { readFilePart } from "../lib/multipart-parts.js";
-import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { quotaRefusal } from "../lib/quota.js";
+import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
@@ -137,75 +137,6 @@ function serializeFile(row: typeof schema.userFiles.$inferSelect) {
  */
 function sendOverQuota(reply: FastifyReply, message: string) {
   return reply.status(413).send({ error: message, code: "STORAGE_QUOTA_EXCEEDED" });
-}
-
-/**
- * Why storing `additionalBytes` more would put the user, or their team, over
- * quota: the message for a 413, or null when it fits. Uses the pre-computed
- * storageUsed counters. A database fault throws rather than reading as "over
- * quota", so the caller answers a reported 500 instead of a 413 nobody looks
- * into (#1473).
- *
- * `lock` is for the transaction that charges the bytes: it locks the user's
- * row, and the team's row when the team has a quota, before reading. A
- * concurrent upload by the same user or a teammate then waits here until this
- * one commits and sees its charge, so two uploads that each fit can't both
- * land over the limit. NO KEY UPDATE is enough for that and, unlike UPDATE,
- * doesn't hold up inserts elsewhere that reference the user.
- */
-async function quotaRefusal(
-  conn: Pick<typeof db, "select">,
-  userId: string,
-  additionalBytes: number,
-  lock = false,
-): Promise<string | null> {
-  const userQuery = conn
-    .select({
-      storageUsed: schema.users.storageUsed,
-      storageQuota: schema.users.storageQuota,
-      team: schema.users.team,
-    })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  const [user] = lock ? await userQuery.for("no key update") : await userQuery;
-
-  if (!user) return null;
-  const { storageUsed, storageQuota, team } = user;
-
-  // Per-user quota: user-level override, then env fallback
-  const userLimit =
-    storageQuota ??
-    (env.MAX_STORAGE_PER_USER_MB > 0 ? env.MAX_STORAGE_PER_USER_MB * 1024 * 1024 : 0);
-  if (userLimit > 0 && storageUsed + additionalBytes > userLimit) {
-    return `Storage quota exceeded. Used ${((storageUsed + additionalBytes) / (1024 * 1024)).toFixed(1)}MB of ${(userLimit / (1024 * 1024)).toFixed(1)}MB`;
-  }
-
-  // Per-team quota. Only a team with a quota is locked: every upload on the
-  // instance would otherwise queue on the Default team's row.
-  if (team) {
-    const teamQuery = conn
-      .select({ storageQuota: schema.teams.storageQuota })
-      .from(schema.teams)
-      .where(and(eq(schema.teams.id, team), isNotNull(schema.teams.storageQuota)))
-      .limit(1);
-    const [teamRow] = lock ? await teamQuery.for("no key update") : await teamQuery;
-
-    if (teamRow?.storageQuota) {
-      const [teamUsed] = await conn
-        .select({
-          total: sql<number>`coalesce(sum(${schema.users.storageUsed}), 0)`,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.team, team));
-
-      const teamTotal = Number(teamUsed.total);
-      if (teamTotal + additionalBytes > teamRow.storageQuota) {
-        return `Team storage quota exceeded. Team used ${((teamTotal + additionalBytes) / (1024 * 1024)).toFixed(1)}MB of ${(teamRow.storageQuota / (1024 * 1024)).toFixed(1)}MB`;
-      }
-    }
-  }
-  return null;
 }
 
 // ── Route registration ─────────────────────────────────────────────
@@ -363,23 +294,47 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           // reported 500 for anything unexpected. Either way the batch so far
           // is discarded first.
           let safeBuffer: Buffer = buffer;
-          if (isSvgBuffer(buffer)) {
+          const ext = part.filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+          let isDecompressedSvg = false;
+          if (ext === ".svgz" || isSvgBuffer(buffer)) {
             try {
-              safeBuffer = sanitizeSvg(buffer);
+              if (ext === ".svgz") {
+                safeBuffer = decompressSvgz(buffer);
+              }
+              if (isSvgBuffer(safeBuffer)) {
+                safeBuffer = sanitizeSvg(safeBuffer);
+                if (ext === ".svgz") {
+                  isDecompressedSvg = true;
+                }
+              }
             } catch (err) {
-              if ((err as { statusCode?: number }).statusCode === 400) {
+              if ((err as Error).message.includes("SVGZ file does not contain")) {
+                // Not a valid SVG inside, let it fall through to be stored as octet-stream
+                request.log.warn(
+                  { err, filename: part.filename },
+                  "Uploaded .svgz file does not contain SVG, storing as opaque file",
+                );
+                safeBuffer = buffer;
+              } else if (
+                (err as { statusCode?: number }).statusCode === 400 ||
+                (err as { code?: string }).code === "Z_DATA_ERROR" ||
+                (err as { code?: string }).code === "Z_BUF_ERROR" ||
+                err instanceof RangeError
+              ) {
+                request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
                 await discardStaged();
                 return reply.status(400).send({ error: (err as Error).message });
+              } else {
+                request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+                void reportError(err, {
+                  source: "http",
+                  route: "/api/v1/files/upload",
+                  method: "POST",
+                  statusCode: 500,
+                });
+                await discardStaged();
+                return reply.status(500).send({ error: "Internal server error" });
               }
-              request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
-              void reportError(err, {
-                source: "http",
-                route: "/api/v1/files/upload",
-                method: "POST",
-                statusCode: 500,
-              });
-              await discardStaged();
-              return reply.status(500).send({ error: "Internal server error" });
             }
           }
 
@@ -399,9 +354,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           const validation = await validateImageBuffer(safeBuffer, part.filename).catch(() => null);
           const isValidImage = validation?.valid === true;
 
-          const safeName = sanitizeFilename(part.filename ?? "upload");
+          let safeName = sanitizeFilename(part.filename ?? "upload");
+          if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
+            safeName = safeName.replace(/\.svgz$/i, ".svg");
+          }
           const mimeType =
-            (isValidImage && validatedImageMime(validation, part.filename)) ||
+            (isValidImage && validatedImageMime(validation, safeName)) ||
             unverifiedMime(part.mimetype || "application/octet-stream");
           const dimensions = measuredDimensions(isValidImage ? validation : null);
 
@@ -902,7 +860,46 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Sanitize SVG results to prevent XXE, SSRF, and script injection
-    const safeResultBuffer = isSvgBuffer(fileBuffer) ? sanitizeSvg(fileBuffer) : fileBuffer;
+    let safeResultBuffer = fileBuffer;
+    const resultExt = filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+    let isDecompressedSvg = false;
+    if (resultExt === ".svgz" || isSvgBuffer(fileBuffer)) {
+      try {
+        if (resultExt === ".svgz") {
+          safeResultBuffer = decompressSvgz(fileBuffer);
+        }
+        if (isSvgBuffer(safeResultBuffer)) {
+          safeResultBuffer = sanitizeSvg(safeResultBuffer);
+          if (resultExt === ".svgz") {
+            isDecompressedSvg = true;
+          }
+        }
+      } catch (err) {
+        if ((err as Error).message.includes("SVGZ file does not contain")) {
+          request.log.warn(
+            { err, filename },
+            "Result .svgz file does not contain SVG, storing as opaque file",
+          );
+          safeResultBuffer = fileBuffer;
+        } else if (
+          (err as { statusCode?: number }).statusCode === 400 ||
+          (err as { code?: string }).code === "Z_DATA_ERROR" ||
+          (err as { code?: string }).code === "Z_BUF_ERROR"
+        ) {
+          request.log.warn({ err, filename }, "SVGZ decompression failed");
+          return reply.status(400).send({ error: (err as Error).message });
+        } else {
+          request.log.error({ err, filename }, "SVG sanitize failed");
+          void reportError(err, {
+            source: "http",
+            route: "/api/v1/files/save-result",
+            method: "POST",
+            statusCode: 500,
+          });
+          return reply.status(500).send({ error: "Internal server error" });
+        }
+      }
+    }
 
     // Try image validation on the bytes that will be stored; non-image outputs
     // from trusted tools are accepted
@@ -933,12 +930,14 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const newChain = toolId ? [...existingChain, toolId] : existingChain;
 
     // Determine the original filename (preserve parent's name, update extension)
-    const ext = extname(filename) || extname(parent.originalName);
+    let ext = extname(filename) || extname(parent.originalName);
+    if (isDecompressedSvg && ext.toLowerCase() === ".svgz") ext = ".svg";
     const baseName = parent.originalName.replace(/\.[^.]+$/, "");
     const resultName = `${baseName}${ext}`;
 
     const mimeType =
-      (isValidImage && validatedImageMime(validation, filename)) || unverifiedMime(extToMime(ext));
+      (isValidImage && validatedImageMime(validation, resultName)) ||
+      unverifiedMime(extToMime(ext));
     const dimensions = measuredDimensions(isValidImage ? validation : null);
 
     // Re-check quota with actual file size before persisting

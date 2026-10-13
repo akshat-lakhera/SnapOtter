@@ -223,13 +223,14 @@ export function useToolProcessor(toolId: string) {
   // The throw is reported as well as logged, or it never reaches Sentry
   // (#1812). Each entry gets its own try, so one write that throws can't
   // leave a batch's later entries pulsing (#1821, the twin of the pipeline's
-  // #1779), and the settle reports once, not once per entry.
+  // #1779), and the settle reports once, not once per entry. `spare` is an
+  // entry a still-live run owns, left processing (#1911).
   const settleProcessingEntries = useCallback(
-    (message: string) => {
+    (message: string, spare?: number) => {
       const { entries, updateEntry } = useFileStore.getState();
       let firstError: { cause: unknown } | null = null;
       for (let i = 0; i < entries.length; i++) {
-        if (entries[i]?.status !== "processing") continue;
+        if (i === spare || entries[i]?.status !== "processing") continue;
         try {
           updateEntry(i, { status: "failed", error: message });
         } catch (err) {
@@ -379,7 +380,11 @@ export function useToolProcessor(toolId: string) {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       es.close();
       if (eventSourceRef.current === es) eventSourceRef.current = null;
-      xhrRef.current?.abort();
+      try {
+        xhrRef.current?.abort();
+      } catch (_e) {
+        console.debug("Ignored xhr.abort error:", _e);
+      }
       batchRunRef.current = null;
       setProgress(IDLE_PROGRESS);
       // The store write that threw may throw again, so each write gets its
@@ -446,6 +451,26 @@ export function useToolProcessor(toolId: string) {
     setError,
     setProcessing,
   ]);
+
+  // Ends a kickoff that threw before it claimed the run refs (#1911). They
+  // still belong to the run that holds them, so endRunAtStart would end
+  // that run instead. Only claimed refs are a failed start's to tear down;
+  // with no live run there is nothing to spare. Behind a live run the
+  // kickoff has only reset outcome state and marked entries processing, so
+  // it fails every entry left at processing except the live run's, and
+  // leaves the run, its processing flag and its error slot alone (a
+  // non-null setError also turns processing off). A batch run owns every
+  // entry, so behind one there is nothing to fail. The caller rethrows, so
+  // the start's throw is still reported.
+  const endStartBeforeClaim = useCallback(() => {
+    if (!activeJobIdRef.current) {
+      endRunAtStart();
+      return;
+    }
+    const liveEntry = activeEntryIndexRef.current;
+    if (liveEntry === null) return;
+    settleProcessingEntries(FRAME_HANDLING_FAILED, liveEntry);
+  }, [endRunAtStart, settleProcessingEntries]);
 
   const reconnectSSE = useCallback(
     (force = false) => {
@@ -514,7 +539,11 @@ export function useToolProcessor(toolId: string) {
               clearStallTimer();
               es.close();
               eventSourceRef.current = null;
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
+              }
               const run = batchRunRef.current;
               if (run) {
                 run.onTerminal(frame);
@@ -556,7 +585,11 @@ export function useToolProcessor(toolId: string) {
               eventSourceRef.current = null;
               // Settle the still-open POST so its late onerror/ontimeout
               // cannot replace this specific error with a generic one.
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
+              }
               setProgress(IDLE_PROGRESS);
               // Each write gets its own guard and the entries settle last, so
               // a write that throws can't leave the run at processing. The run
@@ -591,7 +624,11 @@ export function useToolProcessor(toolId: string) {
               // The SSE settles the run; a still-open sync POST (half-dead
               // proxy, no RST) must not fire a late onerror/ontimeout over
               // this result. abort() only emits onabort, which stays silent.
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
+              }
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
               if (result.savedFileId) {
@@ -747,7 +784,13 @@ export function useToolProcessor(toolId: string) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) eventSourceRef.current.close();
-      if (xhrRef.current) xhrRef.current.abort();
+      if (xhrRef.current) {
+        try {
+          xhrRef.current.abort();
+        } catch (_e) {
+          console.debug("Ignored xhr.abort error:", _e);
+        }
+      }
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
       // This runs on unmount, but also whenever reconnectSSE changes, which it
@@ -778,7 +821,9 @@ export function useToolProcessor(toolId: string) {
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
-      // has no exit to end the run but this one (#1821).
+      // has no exit to end the run but this one (#1821). Until the claim,
+      // the run refs belong to whichever run holds them (#1911).
+      let claimed = false;
       try {
         setError(null);
         setWarning(null);
@@ -792,6 +837,13 @@ export function useToolProcessor(toolId: string) {
           status: "processing",
           error: null,
         });
+
+        const clientJobId = generateId();
+        activeJobIdRef.current = clientJobId;
+        claimed = true;
+        activeEntryIndexRef.current = capturedIndex;
+        asyncModeRef.current = false;
+
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         // A stale evidence timer from a previous degraded run must not fire
@@ -806,11 +858,6 @@ export function useToolProcessor(toolId: string) {
             elapsed: Math.floor((Date.now() - startTime) / 1000),
           }));
         }, 1000);
-
-        const clientJobId = generateId();
-        activeJobIdRef.current = clientJobId;
-        activeEntryIndexRef.current = capturedIndex;
-        asyncModeRef.current = false;
 
         // Open SSE for real-time progress from the server (all tools)
         reconnectSSE(true);
@@ -1104,7 +1151,8 @@ export function useToolProcessor(toolId: string) {
         });
         xhr.send(formData);
       } catch (cause) {
-        endRunAtStart();
+        if (claimed) endRunAtStart();
+        else endStartBeforeClaim();
         throw cause;
       }
     },
@@ -1112,6 +1160,7 @@ export function useToolProcessor(toolId: string) {
       toolId,
       isAiTool,
       endRunAtStart,
+      endStartBeforeClaim,
       setProcessing,
       setError,
       setActiveJob,
@@ -1173,7 +1222,9 @@ export function useToolProcessor(toolId: string) {
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
-      // has no exit to end the run but this one (#1821).
+      // has no exit to end the run but this one (#1821). Until the claim,
+      // the run refs belong to whichever run holds them (#1911).
+      let claimed = false;
       try {
         setError(null);
         // A batch's per-file notes land on each entry (#1292), not in the
@@ -1201,6 +1252,13 @@ export function useToolProcessor(toolId: string) {
             error: null,
           });
         }
+
+        const clientJobId = generateId();
+        activeJobIdRef.current = clientJobId;
+        claimed = true;
+        activeEntryIndexRef.current = null;
+        asyncModeRef.current = false;
+
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         // A stale evidence timer from a previous degraded run must not fire
@@ -1215,11 +1273,6 @@ export function useToolProcessor(toolId: string) {
             elapsed: Math.floor((Date.now() - startTime) / 1000),
           }));
         }, 1000);
-
-        const clientJobId = generateId();
-        activeJobIdRef.current = clientJobId;
-        activeEntryIndexRef.current = null;
-        asyncModeRef.current = false;
         // The cancel button lives behind the store's activeJob handle. Batch
         // runs arm it for the whole run, sync wait included: since #750 the
         // HTTP response is only an observer, so without this the only exit
@@ -1350,32 +1403,54 @@ export function useToolProcessor(toolId: string) {
           { fileResults, fileNotes, reason, status }: ZipSettle,
         ) => {
           settling = true;
-          const extracted = await unpackBatchZip(zipBlob, { status, toolId });
-          // The unpack awaits: a cancel or a newer run may have ended this
-          // one meanwhile, and its writes would land on that run's state.
-          if (activeJobIdRef.current !== clientJobId) return;
-          if (storeWasReset()) return;
-          if (!extracted) {
-            failRun("Batch processing failed", reason);
-            return;
+          const entriesCount = useFileStore.getState().entries.length;
+          // #1240: Unpacking a massive ZIP into memory fails the client with RangeError.
+          // Above a threshold, skip extraction and just keep the ZIP as the batch result.
+          const skipExtraction = entriesCount >= 100 || zipBlob.size > 50 * 1024 * 1024;
+          let extracted: Record<string, Uint8Array> | null = null;
+
+          if (!skipExtraction) {
+            extracted = await unpackBatchZip(zipBlob, { status, toolId });
+            // The unpack awaits: a cancel or a newer run may have ended this
+            // one meanwhile, and its writes would land on that run's state.
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
+            if (!extracted) {
+              failRun("Batch processing failed", reason);
+              return;
+            }
+          } else {
+            // Still need to respect cancel across the async tick
+            await new Promise((r) => setTimeout(r, 0));
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
           }
-          // Only a ZIP that opened is kept as the batch's download.
+
+          // Only a ZIP that opened (or skipped unpacking) is kept as the batch's download.
           setBatchZip(zipBlob, `batch-${toolId}.zip`);
 
           const entries = useFileStore.getState().entries;
           for (let i = 0; i < entries.length; i++) {
             const processedName = fileResults[String(i)];
-            if (processedName && extracted[processedName]) {
-              const ext = processedName.split(".").pop()?.toLowerCase() ?? "";
-              const blobType = MIME_BY_EXT[ext];
-              const blob = new Blob(
-                [extracted[processedName] as BlobPart],
-                blobType ? { type: blobType } : undefined,
-              );
+            if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
+              let processedUrl = null;
+              let processedSize = null;
+
+              if (extracted && extracted[processedName]) {
+                const ext = processedName.split(".").pop()?.toLowerCase() ?? "";
+                const blobType = MIME_BY_EXT[ext];
+                const blob = new Blob(
+                  [extracted[processedName] as BlobPart],
+                  blobType ? { type: blobType } : undefined,
+                );
+                processedUrl = URL.createObjectURL(blob);
+                processedSize = blob.size;
+              }
+
               updateEntry(i, {
-                processedUrl: URL.createObjectURL(blob),
+                processedUrl,
                 processedFilename: processedName,
-                processedSize: blob.size,
+                processedSize,
                 // Batch results come from the ZIP, not a server preview; clear any
                 // stale processedPreviewUrl so an earlier single run's preview
                 // can't win over this result (displayUrl prefers it) (#746).
@@ -1505,7 +1580,11 @@ export function useToolProcessor(toolId: string) {
             canceledByUser = true;
             // The upload may still be in flight; aborting it is what actually
             // stops ingress when no job row exists server-side yet.
-            xhrRef.current?.abort();
+            try {
+              xhrRef.current?.abort();
+            } catch (_e) {
+              console.debug("Ignored xhr.abort error:", _e);
+            }
             failRun("Canceled", "canceled");
             return true;
           },
@@ -1704,7 +1783,8 @@ export function useToolProcessor(toolId: string) {
         });
         xhr.send(formData);
       } catch (cause) {
-        endRunAtStart();
+        if (claimed) endRunAtStart();
+        else endStartBeforeClaim();
         throw cause;
       }
     },
@@ -1712,6 +1792,7 @@ export function useToolProcessor(toolId: string) {
       toolId,
       processFiles,
       endRunAtStart,
+      endStartBeforeClaim,
       setProcessing,
       setError,
       setActiveJob,

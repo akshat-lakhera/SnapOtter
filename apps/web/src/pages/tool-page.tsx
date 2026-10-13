@@ -666,7 +666,7 @@ export function ToolPage() {
     (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? FileImage;
 
   const hasFile = files.length > 0;
-  const hasProcessed = !!processedUrl;
+  const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
   const isProcessing = currentEntry?.status === "processing";
   const displayMode = registryEntry.displayMode;
   const isNoDropzone = displayMode === "no-dropzone";
@@ -810,7 +810,9 @@ export function ToolPage() {
 
       if (!isNativeVideo && currentExt) {
         const previewFile = hasProcessed ? undefined : currentEntry?.file;
-        const previewSrc = hasProcessed ? (processedUrl ?? originalBlobUrl) : undefined;
+        const previewSrc = hasProcessed
+          ? (processedUrl ?? originalBlobUrl ?? undefined)
+          : undefined;
         const previewSize = hasProcessed
           ? (currentEntry?.processedSize ?? null)
           : (currentEntry?.file?.size ?? 0);
@@ -1027,6 +1029,7 @@ export function ToolPage() {
       shouldShowConversionCard({
         hasProcessed,
         isProcessedPreviewable,
+        processedUrl,
         processedPreviewUrl,
         originalBlobUrl,
         displayMode,
@@ -1304,7 +1307,7 @@ export function ToolPage() {
           </button>
         )}
 
-        {hasProcessed && processedSize != null && (
+        {hasProcessed && (processedSize != null || batchTotal > 1) && (
           <div className="animate-fade-in">
             <ReviewPanel
               filename={processedFileName}

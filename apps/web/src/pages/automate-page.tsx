@@ -125,7 +125,7 @@ export function AutomatePage() {
   const [importError, setImportError] = useState<string | null>(null);
 
   const hasFile = files.length > 0;
-  const hasProcessed = !!processedUrl;
+  const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
   const hasMultiple = entries.length > 1;
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex < entries.length - 1;
@@ -341,52 +341,85 @@ export function AutomatePage() {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      // Each stage fails on its own and gets its own message (#1956): a file
+      // that won't parse is a bad file, a save request that got no answer is
+      // a network error, and a failed refresh after a good save must say
+      // the list is stale rather than leave the new pipeline invisible.
+      let data: unknown;
       try {
-        const text = await file.text();
-        const data = JSON.parse(text);
+        data = JSON.parse(await file.text());
+      } catch {
+        setImportError(t.automate.couldNotRead);
+        return;
+      }
 
-        if (data.format !== "snapotter-pipeline") {
-          setImportError(t.automate.invalidPipelineFile);
-          return;
-        }
-        if (typeof data.version !== "number" || data.version > 1) {
-          setImportError(t.automate.newerVersion);
-          return;
-        }
-        if (!data.name || typeof data.name !== "string") {
-          setImportError(t.automate.missingName);
-          return;
-        }
-        if (!Array.isArray(data.steps) || data.steps.length === 0) {
-          setImportError(t.automate.noSteps);
-          return;
-        }
+      if (
+        !data ||
+        typeof data !== "object" ||
+        (data as { format?: unknown }).format !== "snapotter-pipeline"
+      ) {
+        setImportError(t.automate.invalidPipelineFile);
+        return;
+      }
+      const pipeline = data as {
+        version?: unknown;
+        name?: unknown;
+        description?: unknown;
+        steps?: unknown;
+      };
+      if (typeof pipeline.version !== "number" || pipeline.version > 1) {
+        setImportError(t.automate.newerVersion);
+        return;
+      }
+      if (!pipeline.name || typeof pipeline.name !== "string") {
+        setImportError(t.automate.missingName);
+        return;
+      }
+      if (!Array.isArray(pipeline.steps) || pipeline.steps.length === 0) {
+        setImportError(t.automate.noSteps);
+        return;
+      }
 
-        const res = await fetch(appUrl("/api/v1/pipeline/save"), {
+      let res: Response;
+      try {
+        res = await fetch(appUrl("/api/v1/pipeline/save"), {
           method: "POST",
           headers: formatHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
-            name: data.name,
-            description: data.description || undefined,
-            steps: data.steps,
+            name: pipeline.name,
+            description: pipeline.description || undefined,
+            steps: pipeline.steps,
           }),
         });
+      } catch {
+        setImportError(t.errors.networkError);
+        return;
+      }
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          setImportError(failedAnswerMessage(t, body, res.status, t.automate.importFailed));
-          return;
-        }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setImportError(failedAnswerMessage(t, body, res.status, t.automate.importFailed));
+        return;
+      }
 
+      try {
         const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
-        if (listRes.ok) {
-          const listData = await listRes.json();
-          setSavedPipelines(listData.pipelines || []);
+        if (!listRes.ok) {
+          setImportError(t.automate.importListRefreshFailed);
+          return;
         }
+        const listData: unknown = await listRes.json();
+        const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
+        if (!Array.isArray(pipelines)) {
+          // An OK answer without the list (a proxy's `{}`) must not blank it.
+          setImportError(t.automate.importListRefreshFailed);
+          return;
+        }
+        setSavedPipelines(pipelines);
       } catch {
-        setImportError(t.automate.couldNotRead);
+        setImportError(t.automate.importListRefreshFailed);
       }
     };
     input.click();
@@ -450,6 +483,28 @@ export function AutomatePage() {
     if (!sourceUrl) return null;
 
     if (mode === "result") {
+      // If we skipped extraction to save memory on a huge batch, there's no url to preview.
+      // Show the success card instead of failing or staying blank.
+      if (!processedUrl && currentEntry?.status === "completed") {
+        const fname = currentEntry.processedFilename ?? selectedFileName ?? files[0]?.name ?? "";
+        const ext = fname.split(".").pop()?.toUpperCase() ?? "";
+        return (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-6 max-w-xs">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-3">
+                <CheckCircle2 className="h-7 w-7 text-success-ink" />
+              </div>
+              <p className="font-medium text-foreground mb-1">{fname}</p>
+              {processedSize != null && (
+                <p className="text-xs text-muted-foreground">
+                  {ext} &middot; {formatFileSize(processedSize)}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      }
+
       if (!processedUrl) return null;
       if (kind === "image") {
         return (

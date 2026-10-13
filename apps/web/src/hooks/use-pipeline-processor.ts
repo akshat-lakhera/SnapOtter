@@ -158,11 +158,12 @@ export function usePipelineProcessor() {
   // Each entry gets its own try, so one write that throws can't leave a
   // batch's later entries pulsing (#1779). Each throw is logged, and the
   // first is reported, once per settle rather than once per entry (#1812).
-  const settleProcessingEntries = useCallback((message: string) => {
+  // `spare` is an entry a still-live run owns, left processing (#1911).
+  const settleProcessingEntries = useCallback((message: string, spare?: number) => {
     const { entries, updateEntry } = useFileStore.getState();
     let firstError: { cause: unknown } | null = null;
     for (let i = 0; i < entries.length; i++) {
-      if (entries[i]?.status !== "processing") continue;
+      if (i === spare || entries[i]?.status !== "processing") continue;
       try {
         updateEntry(i, { status: "failed", error: message });
       } catch (err) {
@@ -248,7 +249,11 @@ export function usePipelineProcessor() {
       // run spinning with its cancel button already gone (#1814).
       let teardownError: { cause: unknown } | null = null;
       try {
-        xhrRef.current?.abort();
+        try {
+          xhrRef.current?.abort();
+        } catch (_e) {
+          console.debug("Ignored xhr.abort error:", _e);
+        }
         clearJobEvidenceTimer();
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -295,7 +300,11 @@ export function usePipelineProcessor() {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       es.close();
       if (eventSourceRef.current === es) eventSourceRef.current = null;
-      xhrRef.current?.abort();
+      try {
+        xhrRef.current?.abort();
+      } catch (_e) {
+        console.debug("Ignored xhr.abort error:", _e);
+      }
       batchRunRef.current = null;
       setProgress(IDLE_PROGRESS);
       // The store write that threw may throw again, so each write gets its
@@ -359,6 +368,26 @@ export function usePipelineProcessor() {
     setError,
     setProcessing,
   ]);
+
+  // Ends a kickoff that threw before it claimed the run refs (#1911). They
+  // still belong to the run that holds them, so endRunAtStart would end
+  // that run instead. Only claimed refs are a failed start's to tear down;
+  // with no live run there is nothing to spare. Behind a live run the
+  // kickoff has only reset outcome state and marked entries processing, so
+  // it fails every entry left at processing except the live run's, and
+  // leaves the run, its processing flag and its error slot alone (a
+  // non-null setError also turns processing off). A batch run owns every
+  // entry, so behind one there is nothing to fail. The caller rethrows, so
+  // the start's throw is still reported.
+  const endStartBeforeClaim = useCallback(() => {
+    if (!activeJobIdRef.current) {
+      endRunAtStart();
+      return;
+    }
+    const liveEntry = activeEntryIndexRef.current;
+    if (liveEntry === null) return;
+    settleProcessingEntries(FRAME_HANDLING_FAILED, liveEntry);
+  }, [endRunAtStart, settleProcessingEntries]);
 
   const reconnectSSE = useCallback(
     (force = false) => {
@@ -426,7 +455,11 @@ export function usePipelineProcessor() {
               clearStallTimer();
               es.close();
               eventSourceRef.current = null;
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
+              }
               const run = batchRunRef.current;
               if (run) {
                 run.onTerminal(frame);
@@ -463,7 +496,11 @@ export function usePipelineProcessor() {
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
               eventSourceRef.current = null;
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
+              }
               batchRunRef.current = null;
               setProgress(IDLE_PROGRESS);
               // Each write gets its own guard and the entries settle last, so
@@ -498,7 +535,11 @@ export function usePipelineProcessor() {
               eventSourceRef.current = null;
               // The SSE settles the run; a still-open sync POST must not
               // fire a late onerror/ontimeout over this result.
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
+              }
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
               useFileStore.getState().updateEntry(idx, {
@@ -589,7 +630,13 @@ export function usePipelineProcessor() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) eventSourceRef.current.close();
-      if (xhrRef.current) xhrRef.current.abort();
+      if (xhrRef.current) {
+        try {
+          xhrRef.current.abort();
+        } catch (_e) {
+          console.debug("Ignored xhr.abort error:", _e);
+        }
+      }
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
     };
@@ -601,7 +648,9 @@ export function usePipelineProcessor() {
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
-      // has no exit to end the run but this one (#1821).
+      // has no exit to end the run but this one (#1821). Until the claim,
+      // the run refs belong to whichever run holds them (#1911).
+      let claimed = false;
       try {
         setError(null);
         useFileStore.getState().updateEntry(capturedIndex, {
@@ -611,6 +660,12 @@ export function usePipelineProcessor() {
           status: "processing",
           error: null,
         });
+
+        const clientJobId = generateId();
+        activeJobIdRef.current = clientJobId;
+        claimed = true;
+        activeEntryIndexRef.current = capturedIndex;
+
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         // A stale evidence timer from a previous degraded run must not fire
@@ -629,9 +684,6 @@ export function usePipelineProcessor() {
           }));
         }, 1000);
 
-        const clientJobId = generateId();
-        activeJobIdRef.current = clientJobId;
-        activeEntryIndexRef.current = capturedIndex;
         // Arm the ProgressCard cancel button for the whole run (#771); every
         // settle path disarms it through clearActiveJob.
         setActiveJob(clientJobId, cancelCurrentJob);
@@ -871,13 +923,15 @@ export function usePipelineProcessor() {
         });
         xhr.send(formData);
       } catch (cause) {
-        endRunAtStart();
+        if (claimed) endRunAtStart();
+        else endStartBeforeClaim();
         throw cause;
       }
     },
     [
       setProcessing,
       endRunAtStart,
+      endStartBeforeClaim,
       setError,
       setActiveJob,
       cancelCurrentJob,
@@ -908,7 +962,9 @@ export function usePipelineProcessor() {
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
-      // has no exit to end the run but this one (#1821).
+      // has no exit to end the run but this one (#1821). Until the claim,
+      // the run refs belong to whichever run holds them (#1911).
+      let claimed = false;
       try {
         setError(null);
         // Mirror processSingle's reset for every entry this batch sends: an
@@ -931,6 +987,12 @@ export function usePipelineProcessor() {
             error: null,
           });
         }
+
+        const clientJobId = generateId();
+        activeJobIdRef.current = clientJobId;
+        claimed = true;
+        activeEntryIndexRef.current = null;
+
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         clearJobEvidenceTimer();
@@ -946,9 +1008,6 @@ export function usePipelineProcessor() {
           }));
         }, 1000);
 
-        const clientJobId = generateId();
-        activeJobIdRef.current = clientJobId;
-        activeEntryIndexRef.current = null;
         // Arm the ProgressCard cancel button for the whole run (#771).
         setActiveJob(clientJobId, cancelCurrentJob);
 
@@ -999,26 +1058,47 @@ export function usePipelineProcessor() {
           fileResults: Record<string, string>,
           status?: number,
         ) => {
-          const extracted = await unpackBatchZip(zipBlob, { status });
-          // The unpack awaits: a cancel or a newer run may have ended this
-          // one meanwhile, and its writes would land on that run's state.
-          if (activeJobIdRef.current !== clientJobId) return;
-          if (!extracted) {
-            failRun("Batch processing failed");
-            return;
+          const entriesCount = useFileStore.getState().entries.length;
+          // #1240: Unpacking a massive ZIP into memory fails the client with RangeError.
+          // Above a threshold, skip extraction and just keep the ZIP as the batch result.
+          const skipExtraction = entriesCount >= 100 || zipBlob.size > 50 * 1024 * 1024;
+          let extracted: Record<string, Uint8Array> | null = null;
+
+          if (!skipExtraction) {
+            extracted = await unpackBatchZip(zipBlob, { status });
+            // The unpack awaits: a cancel or a newer run may have ended this
+            // one meanwhile, and its writes would land on that run's state.
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (!extracted) {
+              failRun("Batch processing failed");
+              return;
+            }
+          } else {
+            // Still need to respect cancel across the async tick
+            await new Promise((r) => setTimeout(r, 0));
+            if (activeJobIdRef.current !== clientJobId) return;
           }
-          // Only a ZIP that opened is kept as the batch's download.
+
+          // Only a ZIP that opened (or skipped unpacking) is kept as the batch's download.
           setBatchZip(zipBlob, "batch-pipeline.zip");
 
           const entries = useFileStore.getState().entries;
           for (let i = 0; i < entries.length; i++) {
             const processedName = fileResults[String(i)];
-            if (processedName && extracted[processedName]) {
-              const blob = new Blob([extracted[processedName] as BlobPart]);
+            if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
+              let processedUrl = null;
+              let processedSize = null;
+
+              if (extracted && extracted[processedName]) {
+                const blob = new Blob([extracted[processedName] as BlobPart]);
+                processedUrl = URL.createObjectURL(blob);
+                processedSize = blob.size;
+              }
+
               updateEntry(i, {
-                processedUrl: URL.createObjectURL(blob),
+                processedUrl,
                 processedFilename: processedName,
-                processedSize: blob.size,
+                processedSize,
                 status: "completed",
                 error: null,
               });
@@ -1298,12 +1378,14 @@ export function usePipelineProcessor() {
         });
         xhr.send(formData);
       } catch (cause) {
-        endRunAtStart();
+        if (claimed) endRunAtStart();
+        else endStartBeforeClaim();
         throw cause;
       }
     },
     [
       processSingle,
+      endStartBeforeClaim,
       setProcessing,
       endRunAtStart,
       setError,

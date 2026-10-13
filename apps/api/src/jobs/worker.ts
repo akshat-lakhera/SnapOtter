@@ -167,6 +167,27 @@ export interface LoadedToolInputs {
  * code: surface it as an operational failure with a message the user can act
  * on, instead of a raw, stackless ENOENT that Sentry files as a bug (#901).
  */
+/**
+ * Which body runs a job: the path-backed AI handler, the AI job handler, or the
+ * tool registry's process fn.
+ *
+ * Registering an AI job handler says the tool is AI-backed; it does not say the
+ * handler owns every job shape. The handler is the standalone path (for
+ * remove-background, Phase 1 of a two-phase flow), while the process fn owns
+ * the finished job. Letting the handler win every kind is how thirteen tools
+ * came to behave differently in a pipeline than on their own page (#2076).
+ * ocr-pdf keeps its path-backed handler contract either way.
+ */
+export function selectJobDispatch(toolId: string, kind: ToolJobData["kind"]): JobDispatch {
+  if (hasAiPathJobHandler(toolId)) return "ai-path";
+  if ((kind === "pipeline-step" || kind === "batch-child") && getToolConfig(toolId)?.processV2) {
+    return "registry";
+  }
+  return hasAiJobHandler(toolId) ? "ai-handler" : "registry";
+}
+
+export type JobDispatch = "ai-path" | "ai-handler" | "registry";
+
 export async function loadToolInputs(
   toolId: string,
   refs: string[],
@@ -262,6 +283,7 @@ export interface LegacyResultPayload {
   originalSize: number;
   processedSize: number;
   savedFileId?: string;
+  autoSaveError?: string;
   [key: string]: unknown;
 }
 
@@ -282,6 +304,9 @@ export function buildLegacyResultPayload(
   }
   if (jobResult.savedFileId) {
     payload.savedFileId = jobResult.savedFileId;
+  }
+  if (jobResult.autoSaveError) {
+    payload.autoSaveError = jobResult.autoSaveError;
   }
   if (jobResult.resultPayload) {
     Object.assign(payload, jobResult.resultPayload);
@@ -489,7 +514,9 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         | Array<{ name: string; buffer?: Buffer; scratchPath?: string; contentType: string }>
         | undefined;
 
-      if (hasAiPathJobHandler(data.toolId)) {
+      const dispatch = selectJobDispatch(data.toolId, data.kind);
+
+      if (dispatch === "ai-path") {
         if (!pathInput) throw new Error(`No path-backed input for ${data.toolId}`);
         const aiResult = await runAiPathToolJob(data, pathInput, ctx);
         handlerReturned = true;
@@ -499,7 +526,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         resultContentType = aiResult.contentType;
         resultPayload = aiResult.resultPayload;
         extraOutputs = aiResult.extraOutputs;
-      } else if (hasAiJobHandler(data.toolId)) {
+      } else if (dispatch === "ai-handler") {
         if (!inputBuffer) throw new Error(`No buffered input for ${data.toolId}`);
         const aiResult = await runAiToolJob(data, inputBuffer, ctx);
         handlerReturned = true;
@@ -631,12 +658,13 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // version. Without a fileId this is a no-op, so tool-first uploads are
       // not auto-saved.
       let savedFileId: string | undefined;
+      let autoSaveError: string | undefined;
       if (resultBuffer) {
         // Re-check just before the library overwrite, the one write a cancel is
         // most costly to lose to. A cancel landing during the save itself is not
         // covered (#2092).
         if (wasUserCanceled(jobId)) throw new Error("Canceled");
-        savedFileId = await autoSaveToLibrary({
+        const autoSaveResult = await autoSaveToLibrary({
           fileId: data.fileId,
           saveMode: data.saveMode,
           userId: data.userId,
@@ -645,6 +673,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           contentType: resultContentType,
           toolId: data.toolId,
         });
+        savedFileId = autoSaveResult.fileId;
+        autoSaveError = autoSaveResult.error;
       } else if (data.fileId) {
         logger.info(
           { jobId, toolId: data.toolId, bytes: resultSize },
@@ -663,6 +693,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         processedSize: resultSize,
         previewRef,
         savedFileId,
+        autoSaveError,
         resultPayload,
       };
       const legacyResult = buildLegacyResultPayload(jobResult, jobId);

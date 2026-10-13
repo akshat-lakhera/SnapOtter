@@ -7,8 +7,10 @@
  *
  * All tests are tagged @mobile so the device projects' grep filter picks them up.
  */
+
+import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
+import { expect, getE2eRunRoot, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 // Six Letter pages: enough thumbnails to be taller than a phone's preview area.
 const ORGANIZE_PDF_FIXTURE = path.join(
@@ -147,6 +149,60 @@ test.describe("@mobile A result taller than the preview area", () => {
       .locator("#main-content")
       .getByRole("button", { name: "Settings", exact: true })
       .click({ trial: true, timeout: 5_000 });
+  });
+
+  test("sizes both before and after images exactly to the slider container", async ({
+    loggedInPage: page,
+  }) => {
+    // 2261: before/after slider size mismatch
+    await page.goto("/image/compress");
+
+    // Create and upload a portrait image (width: 400, height: 800)
+    const portraitPath = path.join(getE2eRunRoot(), "portrait.png");
+    const script = [
+      "const sharp = require('sharp');",
+      `sharp({create:{width:400,height:800,channels:4,background:{r:255,g:0,b:0,alpha:1}}}).png().toFile(${JSON.stringify(portraitPath)})`,
+    ].join(" ");
+    execFileSync("node", ["-e", script]);
+
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(portraitPath);
+
+    // Wait for processing to finish and slider to appear
+    const peekBar = page.getByRole("button", { name: "Process", exact: true });
+    await peekBar.click();
+
+    // Fill target size for compress tool
+    await page.getByRole("spinbutton", { name: /Target Size/i }).fill("500");
+
+    await page.getByTestId("compress-submit").click();
+    await expect(page.getByRole("slider", { name: /before\/after/i })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // Compare bounding boxes
+    const slider = page.getByRole("slider", { name: /before\/after/i });
+    const beforeImg = slider.locator("img[alt='Original']");
+    const afterImg = slider.locator("img[alt='Processed']");
+
+    const sliderBox = await slider.boundingBox();
+    const beforeBox = await beforeImg.boundingBox();
+    const afterBox = await afterImg.boundingBox();
+
+    expect(sliderBox).not.toBeNull();
+    expect(beforeBox).not.toBeNull();
+    expect(afterBox).not.toBeNull();
+
+    // The images should match the container's box exactly (since they use absolute positioning + inset-0 + w-full h-full)
+    expect(beforeBox!.width).toBeCloseTo(sliderBox!.width - 2, 1);
+    expect(beforeBox!.height).toBeCloseTo(sliderBox!.height - 2, 1);
+    expect(afterBox!.width).toBeCloseTo(sliderBox!.width - 2, 1);
+    expect(afterBox!.height).toBeCloseTo(sliderBox!.height - 2, 1);
   });
 });
 

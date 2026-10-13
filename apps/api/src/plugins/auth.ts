@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import {
   ANALYTICS_EVENTS,
+  PASSWORD_MAX_CODE_UNITS,
   PASSWORD_MAX_LENGTH,
   type PasswordRule,
   SafeError,
@@ -29,13 +30,14 @@ import {
 } from "../lib/login-throttle.js";
 import { authAttempts } from "../lib/metrics.js";
 import { normalizePassword, passwordCandidates } from "../lib/password-form.js";
-import { isSecureRequest } from "../lib/secure-cookie.js";
+import { setSessionCookie } from "../lib/session-cookie.js";
 import { getSettingNumber, getSettingStrict, getSettingString } from "../lib/settings-helpers.js";
 import { userLimitReached } from "../lib/user-limit.js";
 import {
   canAssignRole,
   canManageTargetRole,
   getPermissions,
+  hasEffectivePermission,
   isDisabledRole,
   requirePermission,
 } from "../permissions.js";
@@ -44,6 +46,13 @@ import type { ExternalMfaOutcome, MfaPolicy } from "./mfa.js";
 const scryptAsync = promisify(scrypt);
 
 // ── Types ─────────────────────────────────────────────────────────
+
+export class EscalationDeniedError extends Error {
+  constructor() {
+    super("Cannot manage a user beyond your role authority");
+    this.name = "EscalationDeniedError";
+  }
+}
 
 export interface AuthUser {
   id: string;
@@ -104,13 +113,14 @@ async function upgradeLegacyPasswordHash(
   userId: string,
   verifiedHash: string,
   password: string,
-): Promise<void> {
+): Promise<string | undefined> {
   try {
     const upgraded = await hashPassword(normalizePassword(password));
     await db
       .update(schema.users)
       .set({ passwordHash: upgraded })
       .where(and(eq(schema.users.id, userId), eq(schema.users.passwordHash, verifiedHash)));
+    return upgraded;
   } catch (err) {
     request.log.warn({ err, userId }, "Could not upgrade a password hash to its normalized form");
     // request.log has no Sentry bridge, and a fault that persists leaves the other
@@ -164,10 +174,10 @@ interface PasswordRuleFailure {
   maxLength?: number;
 }
 
-async function validatePasswordStrength(typed: string): Promise<PasswordRuleFailure | null> {
-  // Before normalizing: the cap bounds the work every later step does, and the
-  // request schemas leave the length to this check so a refusal can say why (#2037).
-  if (typed.length > PASSWORD_MAX_LENGTH) {
+export async function validatePasswordStrength(typed: string): Promise<PasswordRuleFailure | null> {
+  // Before normalizing: a hard body-size guard to protect the NFKC normalization
+  // step from pathological inputs. Normal usage never hits this.
+  if (typed.length > PASSWORD_MAX_CODE_UNITS) {
     return {
       message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
       rule: "maxLength",
@@ -175,8 +185,19 @@ async function validatePasswordStrength(typed: string): Promise<PasswordRuleFail
       maxLength: PASSWORD_MAX_LENGTH,
     };
   }
+
   // The rules judge the text that will be hashed, not the spelling it was typed in (#2056).
   const password = normalizePassword(typed);
+
+  // Both the minimum and the maximum are measured in Unicode code points (#2310).
+  if (Array.from(password).length > PASSWORD_MAX_LENGTH) {
+    return {
+      message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: PASSWORD_MAX_LENGTH,
+    };
+  }
   // A control character can be saved but never typed back: login refuses NUL
   // outright and browsers strip LF and CR from password inputs (#2055).
   if (/\p{Cc}/u.test(password)) {
@@ -250,7 +271,7 @@ function weakPasswordBody({ message, rule, rules, minLength, maxLength }: Passwo
   };
 }
 
-function validateUsername(username: string): string | null {
+export function validateUsername(username: string): string | null {
   if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
     return "Username must be between 3 and 50 characters";
   }
@@ -264,7 +285,21 @@ function validateUsername(username: string): string | null {
 
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required").max(255, "Username too long"),
-  password: z.string().min(1, "Password is required").max(PASSWORD_MAX_LENGTH, "Password too long"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .max(PASSWORD_MAX_CODE_UNITS, "Password too long")
+    .superRefine((val, ctx) => {
+      if (Array.from(normalizePassword(val)).length > PASSWORD_MAX_LENGTH) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_big,
+          maximum: PASSWORD_MAX_LENGTH,
+          type: "string",
+          inclusive: true,
+          message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+        });
+      }
+    }),
 });
 
 export const changePasswordSchema = z.object({
@@ -397,7 +432,12 @@ export async function ensureDefaultAdmin(): Promise<void> {
   if (env.DEFAULT_PASSWORD.length === 0) {
     throw new Error("DEFAULT_PASSWORD must not be empty; sign-in refuses an empty password");
   }
-  if (env.DEFAULT_PASSWORD.length > PASSWORD_MAX_LENGTH) {
+  if (env.DEFAULT_PASSWORD.length > PASSWORD_MAX_CODE_UNITS) {
+    throw new Error(
+      `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_CODE_UNITS} characters; sign-in refuses a longer password`,
+    );
+  }
+  if (Array.from(normalizePassword(env.DEFAULT_PASSWORD)).length > PASSWORD_MAX_LENGTH) {
     throw new Error(
       `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_LENGTH} characters; sign-in refuses a longer password`,
     );
@@ -560,6 +600,26 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const parsed = loginSchema.safeParse(request.body);
       if (!parsed.success) {
+        const passwordIssue = parsed.error.issues.find(
+          (i) => i.path[0] === "password" && i.code === "too_big",
+        );
+        if (passwordIssue) {
+          const audit = auditFromRequest(request);
+          const rawBody = request.body as Record<string, unknown> | null;
+          const rawUsername = typeof rawBody?.username === "string" ? rawBody.username : "";
+
+          await audit("LOGIN_FAILED", {
+            username: sanitizeAuditInput(rawUsername),
+            reason: "password_too_long",
+          });
+
+          return reply.status(400).send({
+            error: passwordIssue.message,
+            code: "VALIDATION_ERROR",
+            rule: "maxLength",
+            maxLength: PASSWORD_MAX_LENGTH,
+          });
+        }
         return reply.status(400).send({ error: "Username and password are required" });
       }
       const body = parsed.data;
@@ -670,7 +730,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       // Before the MFA branch, which never sees the password again.
       if (legacy) {
-        await upgradeLegacyPasswordHash(request, user.id, user.passwordHash, body.password);
+        const upgraded = await upgradeLegacyPasswordHash(
+          request,
+          user.id,
+          user.passwordHash,
+          body.password,
+        );
+        if (upgraded) {
+          user.passwordHash = upgraded;
+        }
       }
 
       // Two failures used to share one silent catch here and they want
@@ -714,7 +782,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // ── MFA challenge ──────────────────────────────────────────
       if (user.totpEnabled) {
         const mfaToken = randomUUID();
-        await redis.setex(`mfa:${mfaToken}`, 300, user.id);
+        let payload = user.id;
+        if (user.passwordHash) {
+          const hashFingerprint = createHash("sha256")
+            .update(user.passwordHash)
+            .digest("hex")
+            .substring(0, 16);
+          payload = `${user.id}:${hashFingerprint}`;
+        }
+        await redis.setex(`mfa:${mfaToken}`, 300, payload);
 
         await audit("MFA_CHALLENGE_ISSUED", { userId: user.id, username: user.username });
 
@@ -773,11 +849,41 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: user.id,
-        expiresAt,
+      // Wrap the session insert in a transaction that takes FOR SHARE on the user row
+      // and refuses if the hash differs from the one verified. This conflicts with
+      // the FOR NO KEY UPDATE in the password change route, closing the race condition.
+      const inserted = await db.transaction(async (tx) => {
+        const [lockedUser] = await tx
+          .select({ passwordHash: schema.users.passwordHash })
+          .from(schema.users)
+          .where(eq(schema.users.id, user.id))
+          .for("share");
+
+        if (lockedUser?.passwordHash !== user.passwordHash) {
+          return false;
+        }
+
+        await tx.insert(schema.sessions).values({
+          id: token,
+          userId: user.id,
+          expiresAt,
+        });
+
+        return true;
       });
+
+      if (!inserted) {
+        authAttempts.inc({ method: "password", result: "failure" });
+        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        await audit("LOGIN_FAILED", {
+          username: sanitizeAuditInput(body.username),
+          reason: "password_changed_concurrently",
+        });
+
+        // Use a generic delay so this is not a timing oracle
+        await recordThrottleFailure();
+        return reply.status(401).send({ error: "Invalid credentials" });
+      }
 
       // ── Concurrent session limit (FIFO eviction) ──────────────
       const maxSessions = await getSettingNumber("maxSessionsPerUser");
@@ -802,18 +908,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const [teamRow] = await db.select().from(schema.teams).where(eq(schema.teams.id, user.team));
 
-      const cookieReply = reply as FastifyReply & {
-        setCookie?: (name: string, value: string, opts: Record<string, unknown>) => FastifyReply;
-      };
-      if (typeof cookieReply.setCookie === "function") {
-        cookieReply.setCookie("snapotter-session", token, {
-          path: `${env.BASE_PATH}/`,
-          httpOnly: true,
-          sameSite: "strict",
-          secure: isSecureRequest(request),
-          maxAge: SESSION_DURATION_MS / 1000,
-        });
-      }
+      setSessionCookie(request, reply, token);
 
       return reply.send({
         token,
@@ -1017,7 +1112,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const valid =
-        body.currentPassword.length <= PASSWORD_MAX_LENGTH &&
+        body.currentPassword.length <= PASSWORD_MAX_CODE_UNITS &&
         (await verifyUserPassword(body.currentPassword, user.passwordHash)).valid;
       if (!valid) {
         return reply
@@ -1358,6 +1453,36 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         await db.transaction(async (tx) => {
           // Last admin protection, under the lock every admin removal shares (#2231).
           if (updates.role && updates.role !== "admin") await assertNotLastAdmin(tx, id);
+
+          const [currentAdmin] = await tx
+            .select({ role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, admin.id));
+          const [currentUser] = await tx
+            .select({ role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, id));
+
+          if (!currentAdmin || !currentUser) {
+            throw new Error("NOT_FOUND");
+          }
+
+          const currentActor = { ...admin, role: currentAdmin.role };
+
+          if (
+            !(await hasEffectivePermission(currentActor, "users:manage")) ||
+            !(await canManageTargetRole(currentActor, currentUser.role))
+          ) {
+            throw new EscalationDeniedError();
+          }
+
+          if (
+            updates.role &&
+            !(await canAssignRole({ ...admin, role: currentAdmin.role }, updates.role))
+          ) {
+            throw new EscalationDeniedError();
+          }
+
           await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
           // Invalidate all sessions when role changes to force re-login with new permissions
           if (roleChanged) {
@@ -1365,6 +1490,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           }
         });
       } catch (err) {
+        if (err instanceof EscalationDeniedError) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+        }
         if (err instanceof LastAdminError) {
           return reply.status(400).send({
             error: "Cannot demote the last admin",
@@ -1496,6 +1630,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       try {
         await db.transaction((tx) => assertNotLastAdmin(tx, id));
       } catch (err) {
+        if (err instanceof EscalationDeniedError) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+        }
         if (err instanceof LastAdminError) {
           return reply.status(400).send({
             error: "Cannot delete the last admin",
@@ -1521,6 +1664,28 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         await db.transaction(async (tx) => {
           await assertNotLastAdmin(tx, id);
 
+          const [currentAdmin] = await tx
+            .select({ role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, admin.id));
+          const [currentUser] = await tx
+            .select({ role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, id));
+
+          if (!currentAdmin || !currentUser) {
+            throw new Error("NOT_FOUND");
+          }
+
+          const currentActor = { ...admin, role: currentAdmin.role };
+
+          if (
+            !(await hasEffectivePermission(currentActor, "users:manage")) ||
+            !(await canManageTargetRole(currentActor, currentUser.role))
+          ) {
+            throw new EscalationDeniedError();
+          }
+
           // Delete associated sessions
           await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
 
@@ -1528,6 +1693,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           await tx.delete(schema.users).where(eq(schema.users.id, id));
         });
       } catch (err) {
+        if (err instanceof EscalationDeniedError) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+        }
         if (err instanceof LastAdminError) {
           return reply.status(400).send({
             error: "Cannot delete the last admin",

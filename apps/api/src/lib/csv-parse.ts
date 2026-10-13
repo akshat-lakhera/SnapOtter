@@ -2,9 +2,15 @@ import Papa, { type ParseError, type ParseResult } from "papaparse";
 
 // A header Papa can't be handed as itself: it builds each row as `{}` and assigns
 // `row[field] = value`, and a field named __proto__ hits the prototype setter, so
-// the column's cells vanish while meta.fields still lists it (#2096). The NULs make
-// a collision with a real header practically impossible.
-const PROTO_HEADER = "\u0000proto\u0000";
+// the column's cells vanish while meta.fields still lists it (#2096).
+// Papaparse also hard-codes __parsed_extra as an array destination for cells beyond
+// the header width, which mangles a real column with that name (#2269).
+// The NULs make a collision with a real header practically impossible.
+const SENTINELS = new Map<string, string>([
+  ["__proto__", "\u0000proto\u0000"],
+  ["__parsed_extra", "\u0000parsed_extra\u0000"],
+]);
+const SENTINEL_PREFIX = "\u0000";
 
 /**
  * Parse CSV text with a header row into rows keyed by header. Same options and
@@ -19,36 +25,74 @@ const PROTO_HEADER = "\u0000proto\u0000";
  * raw header names, not against what the sentinel restores to.
  */
 export function parseCsvWithHeader(text: string): ParseResult<Record<string, unknown>> {
-  const parsed = Papa.parse<Record<string, unknown>>(text, {
+  // Papa renames duplicate headers on the very first row before applying skipEmptyLines.
+  // A leading completely blank line becomes the "header" it deduplicates, bypassing the
+  // real header row. We strip the BOM and leading blank lines so Papa sees the real header first.
+  const cleanedText = text.replace(/^﻿/, "").replace(/^[\r\n]+/, "");
+
+  const parsed = Papa.parse<Record<string, unknown>>(cleanedText, {
     header: true,
     skipEmptyLines: true,
-    transformHeader: (header) => (header === "__proto__" ? PROTO_HEADER : header),
+    transformHeader: (header) => SENTINELS.get(header) ?? header,
   });
 
   const sentinelFields = parsed.meta.fields ?? [];
-  const taken = new Set(sentinelFields.filter((field) => !field.startsWith(PROTO_HEADER)));
+  const taken = new Set(sentinelFields.filter((field) => !field.startsWith(SENTINEL_PREFIX)));
   const names = new Map<string, string>();
-  // The counter lives outside the loop: every suffix below it is already taken, so
-  // restarting per column would make a header of many copies quadratic.
-  let suffix = 0;
+
+  // To assign deterministic suffixes (name_1, name_2) sequentially without quadratic restarts,
+  // we track the next available suffix per reserved prefix.
+  const suffixCounts = new Map<string, number>();
+
   for (const field of sentinelFields) {
-    if (!field.startsWith(PROTO_HEADER) || names.has(field)) continue;
+    if (!field.startsWith(SENTINEL_PREFIX) || names.has(field)) continue;
+
+    // Reverse the sentinel back to the original reserved keyword it represents
+    const originalReserved = Array.from(SENTINELS.keys()).find((k) =>
+      field.startsWith(SENTINELS.get(k)!),
+    );
+    if (!originalReserved) continue; // Should not happen
+
     let name: string;
+    let suffix = suffixCounts.get(originalReserved) ?? 0;
     do {
-      name = suffix === 0 ? "__proto__" : `__proto___${suffix}`;
+      name = suffix === 0 ? originalReserved : `${originalReserved}_${suffix}`;
       suffix++;
     } while (taken.has(name));
+    suffixCounts.set(originalReserved, suffix);
     taken.add(name);
     names.set(field, name);
   }
+
   if (names.size === 0) return parsed;
   const restore = (key: string) => names.get(key) ?? key;
 
   const data = parsed.data.map((row) => {
     const out: Record<string, unknown> = Object.create(null);
-    for (const [key, value] of Object.entries(row)) out[restore(key)] = value;
+
+    // First, restore all headers that were in parsed.meta.fields (if any).
+    // This ensures user columns always get their intended names before any internal extras.
+    for (const field of parsed.meta.fields || []) {
+      if (field in row) {
+        out[restore(field)] = row[field];
+      }
+    }
+
+    // Now, handle any extra keys PapaParse added (like its internal "__parsed_extra" array).
+    for (const [key, value] of Object.entries(row)) {
+      if (parsed.meta.fields?.includes(key)) continue;
+
+      let finalKey = restore(key);
+      if (finalKey in out) {
+        let suffix = 1;
+        while (`${finalKey}_${suffix}` in out) suffix++;
+        finalKey = `${finalKey}_${suffix}`;
+      }
+      out[finalKey] = value;
+    }
     return out;
   });
+
   const renamedHeaders = parsed.meta.renamedHeaders
     ? Object.fromEntries(
         Object.entries(parsed.meta.renamedHeaders).map(([renamed, original]) => [
@@ -57,6 +101,7 @@ export function parseCsvWithHeader(text: string): ParseResult<Record<string, unk
         ]),
       )
     : undefined;
+
   return {
     ...parsed,
     data,
@@ -89,6 +134,13 @@ export function csvParseFailure(parsed: Pick<ParseResult<unknown>, "data" | "err
   const rows = parsed.data as unknown[];
   const fields = parsed.meta.fields;
   if (rows.length === 0 && !fields?.length) return "The file has no rows";
+
+  if (fields) {
+    const uniqueFields = new Set(fields);
+    if (uniqueFields.size !== fields.length) {
+      return "The file has duplicate column headers";
+    }
+  }
 
   const singleColumn = fields
     ? fields.length === 1

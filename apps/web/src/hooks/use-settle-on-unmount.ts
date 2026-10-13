@@ -28,7 +28,11 @@ export function useSettleOnUnmount(isInFlight: () => boolean, stop: () => void):
     () => () => {
       const { isInFlight: inFlight, stop: abort, message: interrupted } = latest.current;
       if (!inFlight()) return;
-      abort();
+      try {
+        abort();
+      } catch (_e) {
+        console.debug("Ignored abort error:", _e);
+      }
       // A store the user already cleared has nothing left to settle, and a message
       // written now would land on whatever they do next.
       const store = useFileStore.getState();

@@ -5400,6 +5400,8 @@ export const uk: TranslationKeys = {
     noSteps: "У файлі Pipeline немає кроків",
     importFailed: "Імпорт не вдався",
     couldNotRead: "Не вдалося прочитати файл Pipeline",
+    importListRefreshFailed:
+      "Pipeline імпортовано, але список збережених не оновився. Оновіть сторінку, щоб його побачити.",
     fileCount: "{count} файл",
     fileCountPlural: "{count} файлів",
     importFromLibrary: "Імпорт із бібліотеки",
@@ -5644,6 +5646,8 @@ export const uk: TranslationKeys = {
     passwordNeedsSpecial: "Пароль має містити спеціальний символ.",
     passwordNoControlCharacters: "Пароль не має містити керувальні символи.",
     passwordTooLong: "Пароль задовгий (максимум: {maxLength}).",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Забагато спроб. Зачекайте хвилину й спробуйте ще раз.",
     escalationDenied: "Для цього потрібно більше прав, ніж має ваша роль.",
     featureNotLicensed: "Для цього потрібна корпоративна ліцензія.",

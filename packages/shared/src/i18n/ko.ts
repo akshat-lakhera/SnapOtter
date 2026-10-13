@@ -5304,6 +5304,8 @@ export const ko: TranslationKeys = {
     noSteps: "Pipeline 파일에 단계가 없습니다",
     importFailed: "가져오기 실패",
     couldNotRead: "Pipeline 파일을 읽을 수 없습니다",
+    importListRefreshFailed:
+      "Pipeline을 가져왔지만 저장된 목록이 새로고침되지 않았습니다. 페이지를 새로고침하면 표시됩니다.",
     fileCount: "{count}개 파일",
     fileCountPlural: "{count}개 파일",
     importFromLibrary: "라이브러리에서 가져오기",
@@ -5546,6 +5548,8 @@ export const ko: TranslationKeys = {
     passwordNeedsSpecial: "비밀번호에 특수 문자를 포함해야 합니다.",
     passwordNoControlCharacters: "비밀번호에 제어 문자를 포함할 수 없습니다.",
     passwordTooLong: "비밀번호는 {maxLength}자 이하여야 합니다.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요.",
     escalationDenied: "이 작업에는 현재 역할보다 높은 권한이 필요합니다.",
     featureNotLicensed: "엔터프라이즈 라이선스가 필요합니다.",

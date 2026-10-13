@@ -5409,6 +5409,8 @@ export const it: TranslationKeys = {
     noSteps: "Il file Pipeline non ha passaggi",
     importFailed: "Importazione non riuscita",
     couldNotRead: "Impossibile leggere il file Pipeline",
+    importListRefreshFailed:
+      "Pipeline importata, ma l'elenco salvato non si è aggiornato. Ricarica la pagina per vederla.",
     fileCount: "{count} file",
     fileCountPlural: "{count} file",
     importFromLibrary: "Importa dalla libreria",
@@ -5652,6 +5654,8 @@ export const it: TranslationKeys = {
     passwordNeedsSpecial: "La password deve contenere un carattere speciale.",
     passwordNoControlCharacters: "La password non deve contenere caratteri di controllo.",
     passwordTooLong: "La password non può superare {maxLength} caratteri.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Troppi tentativi. Attendi un minuto e riprova.",
     escalationDenied: "Serve un accesso superiore a quello del tuo ruolo.",
     featureNotLicensed: "Serve una licenza enterprise.",

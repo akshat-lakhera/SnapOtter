@@ -5316,6 +5316,8 @@ export const en = {
     noSteps: "Pipeline file has no steps",
     importFailed: "Import failed",
     couldNotRead: "Could not read pipeline file",
+    importListRefreshFailed:
+      "Pipeline imported, but the saved list didn't refresh. Reload the page to see it.",
     fileCount: "{count} file",
     fileCountPlural: "{count} files",
     importFromLibrary: "Import from Library",
@@ -5558,6 +5560,8 @@ export const en = {
     passwordNeedsSpecial: "Password must contain a special character.",
     passwordNoControlCharacters: "Password must not contain control characters.",
     passwordTooLong: "Password must be at most {maxLength} characters.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Too many attempts. Wait a minute and try again.",
     escalationDenied: "That needs more access than your role has.",
     featureNotLicensed: "This needs an enterprise license.",

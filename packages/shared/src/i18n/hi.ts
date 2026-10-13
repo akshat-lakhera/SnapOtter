@@ -5173,6 +5173,8 @@ export const hi: TranslationKeys = {
     noSteps: "Pipeline फाइल में कोई स्टेप नहीं है",
     importFailed: "इम्पोर्ट विफल",
     couldNotRead: "Pipeline फाइल नहीं पढ़ी जा सकी",
+    importListRefreshFailed:
+      "Pipeline इम्पोर्ट हो गया, लेकिन सहेजी गई सूची रीफ्रेश नहीं हुई। देखने के लिए पेज रीलोड करें।",
     fileCount: "{count} फाइल",
     fileCountPlural: "{count} फाइलें",
     importFromLibrary: "लाइब्रेरी से इम्पोर्ट करें",
@@ -5413,6 +5415,8 @@ export const hi: TranslationKeys = {
     passwordNeedsSpecial: "पासवर्ड में एक विशेष वर्ण होना चाहिए।",
     passwordNoControlCharacters: "पासवर्ड में नियंत्रण वर्ण नहीं होने चाहिए।",
     passwordTooLong: "पासवर्ड अधिकतम {maxLength} वर्णों का होना चाहिए।",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "बहुत अधिक प्रयास। एक मिनट रुककर फिर से प्रयास करें।",
     escalationDenied: "इसके लिए आपकी भूमिका से अधिक पहुंच चाहिए।",
     featureNotLicensed: "इसके लिए एंटरप्राइज़ लाइसेंस आवश्यक है।",

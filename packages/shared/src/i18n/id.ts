@@ -5390,6 +5390,8 @@ export const id: TranslationKeys = {
     noSteps: "File Pipeline tidak memiliki langkah",
     importFailed: "Impor gagal",
     couldNotRead: "Tidak dapat membaca file Pipeline",
+    importListRefreshFailed:
+      "Pipeline berhasil diimpor, tetapi daftar tersimpan tidak diperbarui. Muat ulang halaman untuk melihatnya.",
     fileCount: "{count} file",
     fileCountPlural: "{count} file",
     importFromLibrary: "Impor dari Perpustakaan",
@@ -5633,6 +5635,8 @@ export const id: TranslationKeys = {
     passwordNeedsSpecial: "Kata sandi harus mengandung karakter khusus.",
     passwordNoControlCharacters: "Kata sandi tidak boleh mengandung karakter kontrol.",
     passwordTooLong: "Kata sandi maksimal {maxLength} karakter.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Terlalu banyak percobaan. Tunggu satu menit lalu coba lagi.",
     escalationDenied: "Tindakan itu memerlukan akses lebih dari yang dimiliki peran Anda.",
     featureNotLicensed: "Ini memerlukan lisensi enterprise.",

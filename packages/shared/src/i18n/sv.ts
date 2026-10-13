@@ -5389,6 +5389,8 @@ export const sv: TranslationKeys = {
     noSteps: "Pipelinefil har inga steg",
     importFailed: "Import misslyckades",
     couldNotRead: "Kunde inte läsa pipelinefil",
+    importListRefreshFailed:
+      "Pipelinen importerades, men den sparade listan uppdaterades inte. Ladda om sidan för att se den.",
     fileCount: "{count} fil",
     fileCountPlural: "{count} filer",
     importFromLibrary: "Importera från bibliotek",
@@ -5631,6 +5633,8 @@ export const sv: TranslationKeys = {
     passwordNeedsSpecial: "Lösenordet måste innehålla ett specialtecken.",
     passwordNoControlCharacters: "Lösenordet får inte innehålla styrtecken.",
     passwordTooLong: "Lösenordet får vara högst {maxLength} tecken långt.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "För många försök. Vänta en minut och försök igen.",
     escalationDenied: "Det kräver mer åtkomst än din roll har.",
     featureNotLicensed: "Det här kräver en enterprise-licens.",
