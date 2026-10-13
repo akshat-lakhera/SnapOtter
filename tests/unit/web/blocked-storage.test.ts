@@ -181,6 +181,7 @@ describe("blocked browser storage resilience (#2318)", () => {
         },
       };
 
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.stubGlobal("localStorage", throwingStorage);
 
       const { renderHook, act } = await import("@testing-library/react");
@@ -191,13 +192,22 @@ describe("blocked browser storage resilience (#2318)", () => {
       });
 
       expect(result.current.locale).toBe("en");
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Failed to read locale preference from browser storage.",
+        expect.any(DOMException),
+      );
 
+      warnSpy.mockClear();
       // Changing locale must not crash even when setItem throws
       await act(async () => {
         result.current.setLocale("es");
       });
 
       expect(result.current.locale).toBe("es");
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Failed to persist locale preference to browser storage.",
+        expect.any(DOMException),
+      );
       unmount();
     });
   });

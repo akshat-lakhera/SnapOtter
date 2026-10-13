@@ -107,7 +107,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     try {
       hasExplicitChoice = localStorage.getItem(LOCALE_STORAGE_KEY);
     } catch (error) {
-      console.warn("Failed to persist locale preference to browser storage.", error);
+      console.warn("Failed to read locale preference from browser storage.", error);
     }
     if (hasExplicitChoice) return;
 
@@ -145,8 +145,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const setLocale = useCallback((code: string) => {
     try {
       localStorage.setItem(LOCALE_STORAGE_KEY, code);
-    } catch {
-      // Storage blocked or unavailable
+    } catch (error) {
+      console.warn("Failed to persist locale preference to browser storage.", error);
     }
     setLocaleState(code);
   }, []);
